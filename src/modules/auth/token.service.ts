@@ -34,8 +34,6 @@ export class TokenService {
   }): Promise<string> {
     const payload: AccessTokenPayload = {
       sub: params.userId,
-      iss: this.jwtConfig.issuer,
-      aud: this.jwtConfig.audience,
       tenantId: params.tenantId,
       roles: params.roles,
       sessionId: params.sessionId,
@@ -59,8 +57,6 @@ export class TokenService {
       sub: params.userId,
       sid: params.sessionId,
       tid: params.tenantId,
-      iss: this.jwtConfig.issuer,
-      aud: this.jwtConfig.audience,
       type: 'refresh',
     };
 
@@ -88,8 +84,8 @@ export class TokenService {
     return {
       accessToken,
       refreshToken,
-      accessTokenExpiresIn: this.jwtConfig.accessExpiresIn,
-      refreshTokenExpiresIn: this.jwtConfig.refreshExpiresIn,
+      accessTokenExpiresIn: this.getAccessTokenExpiresInSeconds(),
+      refreshTokenExpiresIn: this.getRefreshTokenExpiresInSeconds(),
     };
   }
 
@@ -136,18 +132,20 @@ export class TokenService {
   }
 
   buildRefreshExpiryDate(): Date {
-    return new Date(Date.now() + durationToMilliseconds(this.jwtConfig.refreshExpiresIn));
+    return new Date(
+      Date.now() + durationToMilliseconds(this.jwtConfig.refreshExpiresIn),
+    );
   }
 
-  getAccessSecret(): string {
-    return this.jwtConfig.accessSecret;
+  getAccessTokenExpiresInSeconds(): number {
+    return Math.floor(
+      durationToMilliseconds(this.jwtConfig.accessExpiresIn) / 1000,
+    );
   }
 
-  getIssuer(): string {
-    return this.jwtConfig.issuer;
-  }
-
-  getAudience(): string {
-    return this.jwtConfig.audience;
+  getRefreshTokenExpiresInSeconds(): number {
+    return Math.floor(
+      durationToMilliseconds(this.jwtConfig.refreshExpiresIn) / 1000,
+    );
   }
 }

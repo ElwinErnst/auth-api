@@ -9,8 +9,8 @@ export type AuthMeResponse = {
     id: string;
     name: string;
     slug: string;
-    planCode: string;
+    planCode: string | null;
   };
   roles: string[];
-  sessionId: string;
+  sessionId: string | null;
 };

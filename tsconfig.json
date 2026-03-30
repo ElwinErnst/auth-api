@@ -14,7 +14,7 @@
     "strict": true,
     "skipLibCheck": true,
     "moduleResolution": "node",
-    "types": ["node"]
+    "types": ["node", "jest"]
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "**/*.spec.ts", "**/*.e2e-spec.ts"]
 }

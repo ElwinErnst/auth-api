@@ -11,12 +11,11 @@ export class SessionsService {
     @InjectRepository(Session)
     private readonly sessionsRepository: Repository<Session>,
     private readonly passwordService: PasswordService,
-  ) {}
+  ) { }
 
-  async create(params: {
+  async createEmpty(params: {
     userId: string;
     tenantId: string;
-    refreshToken: string;
     expiresAt: Date;
     familyId?: string;
     userAgent?: string | null;
@@ -26,7 +25,7 @@ export class SessionsService {
       userId: params.userId,
       tenantId: params.tenantId,
       familyId: params.familyId ?? randomUUID(),
-      refreshTokenHash: await this.passwordService.hash(params.refreshToken),
+      refreshTokenHash: '',
       expiresAt: params.expiresAt,
       userAgent: params.userAgent ?? null,
       ip: params.ip ?? null,
@@ -36,6 +35,20 @@ export class SessionsService {
     });
 
     return this.sessionsRepository.save(session);
+  }
+
+  async updateRefreshToken(
+    sessionId: string,
+    refreshToken: string,
+  ): Promise<void> {
+    const session = await this.findById(sessionId);
+
+    if (!session) {
+      throw new UnauthorizedException('Session not found');
+    }
+
+    session.refreshTokenHash = await this.passwordService.hash(refreshToken);
+    await this.sessionsRepository.save(session);
   }
 
   async findActiveById(id: string): Promise<Session | null> {
@@ -69,34 +82,9 @@ export class SessionsService {
     return session.expiresAt.getTime() <= Date.now();
   }
 
-  async rotate(params: {
-    currentSession: Session;
-    newRefreshToken: string;
-    newExpiresAt: Date;
-    userAgent?: string | null;
-    ip?: string | null;
-  }): Promise<Session> {
-    const next = await this.create({
-      userId: params.currentSession.userId,
-      tenantId: params.currentSession.tenantId,
-      refreshToken: params.newRefreshToken,
-      expiresAt: params.newExpiresAt,
-      familyId: params.currentSession.familyId,
-      userAgent: params.userAgent ?? params.currentSession.userAgent,
-      ip: params.ip ?? params.currentSession.ip,
-    });
-
-    params.currentSession.revokedAt = new Date();
-    params.currentSession.replacedBySessionId = next.id;
-    params.currentSession.revokedReason = 'rotated';
-
-    await this.sessionsRepository.save(params.currentSession);
-
-    return next;
-  }
-
   async revokeById(id: string, reason = 'logout'): Promise<void> {
     const session = await this.findById(id);
+
     if (!session || session.revokedAt) {
       return;
     }
@@ -119,11 +107,55 @@ export class SessionsService {
     }
 
     const now = new Date();
+
     for (const session of sessions) {
       session.revokedAt = now;
       session.revokedReason = reason;
     }
 
     await this.sessionsRepository.save(sessions);
+  }
+
+  async revokeFamily(
+    familyId: string,
+    reason = 'refresh_token_reuse_detected',
+  ): Promise<void> {
+    const sessions = await this.sessionsRepository.find({
+      where: {
+        familyId,
+        revokedAt: IsNull(),
+      },
+    });
+
+    if (!sessions.length) {
+      return;
+    }
+
+    const now = new Date();
+
+    for (const session of sessions) {
+      session.revokedAt = now;
+      session.revokedReason = reason;
+    }
+
+    await this.sessionsRepository.save(sessions);
+  }
+
+  async revokeWithReplacement(
+    sessionId: string,
+    replacedBySessionId: string,
+    reason = 'rotated',
+  ): Promise<void> {
+    const session = await this.findById(sessionId);
+
+    if (!session || session.revokedAt) {
+      return;
+    }
+
+    session.revokedAt = new Date();
+    session.replacedBySessionId = replacedBySessionId;
+    session.revokedReason = reason;
+
+    await this.sessionsRepository.save(session);
   }
 }

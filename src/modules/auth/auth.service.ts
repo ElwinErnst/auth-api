@@ -1,19 +1,15 @@
-import {
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { MembershipsService } from '../memberships/memberships.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
-import { LogoutDto } from './dto/logout.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { LogoutDto } from './dto/logout.dto';
 import { PasswordService } from './password.service';
 import { TokenService } from './token.service';
-import { AuthMeResponse } from './types/auth-me-response.type';
-import { AccessTokenPayload } from './types/access-token-payload.type';
 import { TokenPair } from './types/token-pair.type';
+import { AuthMeResponse } from './types/auth-me-response.type';
 
 @Injectable()
 export class AuthService {
@@ -24,13 +20,14 @@ export class AuthService {
     private readonly sessionsService: SessionsService,
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
-  ) {}
+  ) { }
 
   async login(
     dto: LoginDto,
     context?: { userAgent?: string | null; ip?: string | null },
   ): Promise<TokenPair> {
     const user = await this.usersService.findByEmailWithMemberships(dto.email);
+
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -44,11 +41,16 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    let tenantId = dto.tenantId;
+    let tenantId = dto.tenantId ?? null;
 
     if (!tenantId && dto.tenantSlug) {
       const tenant = await this.tenantsService.findBySlug(dto.tenantSlug);
-      tenantId = tenant?.id;
+
+      if (!tenant || !tenant.isActive) {
+        throw new UnauthorizedException('Tenant is required');
+      }
+
+      tenantId = tenant.id;
     }
 
     if (!tenantId) {
@@ -60,50 +62,41 @@ export class AuthService {
       tenantId,
     );
 
-    if (!membership || !membership.tenant.isActive) {
+    if (!membership) {
       throw new UnauthorizedException('User has no access to this tenant');
     }
 
-    const provisionalRefreshToken = await this.tokenService.signRefreshToken({
+    const tenant =
+      membership.tenant ??
+      (await this.tenantsService.findById(membership.tenantId));
+
+    if (!tenant || !tenant.isActive) {
+      throw new UnauthorizedException('User has no access to this tenant');
+    }
+
+    const refreshExpiresAt = this.tokenService.buildRefreshExpiryDate();
+
+    const session = await this.sessionsService.createEmpty({
       userId: user.id,
       tenantId: membership.tenantId,
-      sessionId: 'provisional-session-id',
+      expiresAt: refreshExpiresAt,
+      userAgent: context?.userAgent ?? null,
+      ip: context?.ip ?? null,
     });
 
-    const session = await this.sessionsService.create({
-      userId: user.id,
-      tenantId: membership.tenantId,
-      refreshToken: provisionalRefreshToken,
-      expiresAt: this.tokenService.buildRefreshExpiryDate(),
-      userAgent: context?.userAgent,
-      ip: context?.ip,
-    });
-
-    const finalTokenPair = await this.tokenService.generateTokenPair({
+    const tokenPair = await this.tokenService.generateTokenPair({
       userId: user.id,
       tenantId: membership.tenantId,
       roles: [membership.role],
       sessionId: session.id,
     });
 
-    // Replace provisional hash with the real token tied to the persisted session id
-    await this.sessionsService.revokeById(session.id, 'replaced_provisional');
-    const finalSession = await this.sessionsService.create({
-      userId: user.id,
-      tenantId: membership.tenantId,
-      refreshToken: finalTokenPair.refreshToken,
-      expiresAt: this.tokenService.buildRefreshExpiryDate(),
-      familyId: session.familyId,
-      userAgent: context?.userAgent,
-      ip: context?.ip,
-    });
+    await this.sessionsService.updateRefreshToken(
+      session.id,
+      tokenPair.refreshToken,
+    );
 
-    return this.tokenService.generateTokenPair({
-      userId: user.id,
-      tenantId: membership.tenantId,
-      roles: [membership.role],
-      sessionId: finalSession.id,
-    });
+    return tokenPair;
   }
 
   async refresh(
@@ -112,119 +105,125 @@ export class AuthService {
   ): Promise<TokenPair> {
     const payload = await this.tokenService.verifyRefreshToken(dto.refreshToken);
 
-    const session = await this.sessionsService.findActiveById(payload.sid);
-    if (!session) {
-      throw new UnauthorizedException('Session not found');
+    const currentSession = await this.sessionsService.findActiveById(payload.sid);
+
+    if (!currentSession) {
+      throw new UnauthorizedException('Session is not active');
     }
 
-    if (session.tenantId !== payload.tid || session.userId !== payload.sub) {
-      throw new UnauthorizedException('Session/token mismatch');
+    if (this.sessionsService.isExpired(currentSession)) {
+      await this.sessionsService.revokeById(currentSession.id, 'expired');
+      throw new UnauthorizedException('Refresh token expired');
     }
 
-    if (this.sessionsService.isExpired(session)) {
-      await this.sessionsService.revokeById(session.id, 'expired');
-      throw new UnauthorizedException('Session expired');
+    try {
+      await this.sessionsService.assertRefreshTokenMatch(
+        currentSession,
+        dto.refreshToken,
+      );
+    } catch {
+      await this.sessionsService.revokeFamily(
+        currentSession.familyId,
+        'refresh_token_reuse_detected',
+      );
+      throw new UnauthorizedException('Invalid refresh token');
     }
-
-    await this.sessionsService.assertRefreshTokenMatch(session, dto.refreshToken);
 
     const membership = await this.membershipsService.findActiveMembership(
-      session.userId,
-      session.tenantId,
+      currentSession.userId,
+      currentSession.tenantId,
     );
 
     if (!membership) {
-      throw new UnauthorizedException('Membership not found');
+      await this.sessionsService.revokeFamily(
+        currentSession.familyId,
+        'membership_revoked',
+      );
+      throw new UnauthorizedException('Membership is no longer active');
     }
 
-    const provisionalRefreshToken = await this.tokenService.signRefreshToken({
-      userId: session.userId,
-      tenantId: session.tenantId,
-      sessionId: 'provisional-session-id',
-    });
+    const refreshExpiresAt = this.tokenService.buildRefreshExpiryDate();
 
-    const newSession = await this.sessionsService.rotate({
-      currentSession: session,
-      newRefreshToken: provisionalRefreshToken,
-      newExpiresAt: this.tokenService.buildRefreshExpiryDate(),
-      userAgent: context?.userAgent,
-      ip: context?.ip,
+    const nextSession = await this.sessionsService.createEmpty({
+      userId: currentSession.userId,
+      tenantId: currentSession.tenantId,
+      familyId: currentSession.familyId,
+      expiresAt: refreshExpiresAt,
+      userAgent: context?.userAgent ?? currentSession.userAgent,
+      ip: context?.ip ?? currentSession.ip,
     });
 
     const tokenPair = await this.tokenService.generateTokenPair({
-      userId: session.userId,
-      tenantId: session.tenantId,
+      userId: nextSession.userId,
+      tenantId: nextSession.tenantId,
       roles: [membership.role],
-      sessionId: newSession.id,
+      sessionId: nextSession.id,
     });
 
-    await this.sessionsService.revokeById(newSession.id, 'replaced_provisional');
-    const finalSession = await this.sessionsService.create({
-      userId: session.userId,
-      tenantId: session.tenantId,
-      refreshToken: tokenPair.refreshToken,
-      expiresAt: this.tokenService.buildRefreshExpiryDate(),
-      familyId: newSession.familyId,
-      userAgent: context?.userAgent,
-      ip: context?.ip,
-    });
-
-    await this.sessionsService.revokeById(session.id, 'rotated');
-
-    return this.tokenService.generateTokenPair({
-      userId: session.userId,
-      tenantId: session.tenantId,
-      roles: [membership.role],
-      sessionId: finalSession.id,
-    });
-  }
-
-  async logout(dto: LogoutDto): Promise<{ ok: boolean }> {
-    if (!dto.refreshToken && !dto.sessionId) {
-      throw new UnauthorizedException('refreshToken or sessionId is required');
-    }
-
-    if (dto.sessionId) {
-      await this.sessionsService.revokeById(dto.sessionId, 'logout');
-      return { ok: true };
-    }
-
-    const payload = await this.tokenService.verifyRefreshToken(dto.refreshToken!);
-    await this.sessionsService.revokeById(payload.sid, 'logout');
-    return { ok: true };
-  }
-
-  async logoutAll(currentAuth: AccessTokenPayload): Promise<{ ok: boolean }> {
-    await this.sessionsService.revokeAllForUser(currentAuth.sub, 'logout_all');
-    return { ok: true };
-  }
-
-  async me(currentAuth: AccessTokenPayload): Promise<AuthMeResponse> {
-    const user = await this.usersService.findById(currentAuth.sub);
-    const membership = await this.membershipsService.findActiveMembership(
-      currentAuth.sub,
-      currentAuth.tenantId,
+    await this.sessionsService.updateRefreshToken(
+      nextSession.id,
+      tokenPair.refreshToken,
     );
 
-    if (!membership) {
-      throw new UnauthorizedException('Membership not found');
+    await this.sessionsService.revokeWithReplacement(
+      currentSession.id,
+      nextSession.id,
+      'rotated',
+    );
+
+    return tokenPair;
+  }
+
+  async logout(dto: LogoutDto): Promise<void> {
+    if (dto.sessionId) {
+      await this.sessionsService.revokeById(dto.sessionId, 'logout');
+      return;
     }
 
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
-      tenant: {
-        id: membership.tenant.id,
-        name: membership.tenant.name,
-        slug: membership.tenant.slug,
-        planCode: membership.tenant.planCode,
-      },
-      roles: currentAuth.roles,
-      sessionId: currentAuth.sessionId,
-    };
+    if (dto.refreshToken) {
+      const payload = await this.tokenService.verifyRefreshToken(dto.refreshToken);
+      await this.sessionsService.revokeById(payload.sid, 'logout');
+      return;
+    }
+
+    throw new UnauthorizedException('Refresh token or sessionId is required');
   }
+
+  async logoutAll(userId: string): Promise<void> {
+    await this.sessionsService.revokeAllForUser(userId, 'logout_all');
+  }
+
+  async me(
+  userId: string,
+  tenantId: string,
+  sessionId?: string | null,
+): Promise<AuthMeResponse> {
+  const user = await this.usersService.findById(userId);
+  const tenant = await this.tenantsService.findById(tenantId);
+  const membership = await this.membershipsService.findActiveMembership(
+    userId,
+    tenantId,
+  );
+
+  if (!user || !tenant || !membership) {
+    throw new UnauthorizedException('Profile not found');
+  }
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName ?? null,
+      lastName: user.lastName ?? null,
+    },
+    tenant: {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      planCode: tenant.planCode ?? null,
+    },
+    roles: [membership.role],
+    sessionId: sessionId ?? null,
+  };
+}
 }

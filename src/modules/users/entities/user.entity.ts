@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -14,19 +15,20 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ unique: true })
+  @Index({ unique: true })
+  @Column('text')
   email!: string;
 
-  @Column({ name: 'password_hash' })
+  @Column('text', { name: 'password_hash' })
   passwordHash!: string;
 
-  @Column({ name: 'first_name', nullable: true })
+  @Column('text', { name: 'first_name', nullable: true })
   firstName!: string | null;
 
-  @Column({ name: 'last_name', nullable: true })
+  @Column('text', { name: 'last_name', nullable: true })
   lastName!: string | null;
 
-  @Column({ name: 'is_active', default: true })
+  @Column('boolean', { name: 'is_active', default: true })
   isActive!: boolean;
 
   @OneToMany(() => TenantMembership, (membership) => membership.user)
@@ -35,9 +37,9 @@ export class User {
   @OneToMany(() => Session, (session) => session.user)
   sessions!: Session[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 }

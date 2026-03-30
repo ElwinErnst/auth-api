@@ -1,6 +1,8 @@
-# SentinelSuite auth-api
+# Sentinel Suite auth-api
 
-Auth multi-tenant con:
+Servicio de identidad y directorio multi-tenant.
+
+## Responsabilidades
 
 - usuarios
 - tenants
@@ -8,7 +10,18 @@ Auth multi-tenant con:
 - sesiones
 - refresh token rotation
 - logout y logout-all
-- `/auth/me`
+- emisión de JWT para `zerotrust-api`
+- endpoints internos para consulta de tenants y memberships desde otros servicios
+
+## Estado arquitectónico
+
+`auth-api` es la fuente de verdad de:
+
+- `tenants`
+- `memberships`
+- roles por tenant
+
+`vault-api` ya consume esta información mediante endpoints internos protegidos por secreto compartido.
 
 ## Endpoints principales
 
@@ -18,12 +31,32 @@ Auth multi-tenant con:
 - `POST /api/auth/logout-all`
 - `GET /api/auth/me`
 
-## Setup
+## Endpoints internos
+
+Pensados para uso server-to-server:
+
+- `GET /api/internal/tenants/:id`
+- `GET /api/internal/memberships/resolve?userId=...&tenantId=...`
+- `GET /api/internal/users/:userId/tenants`
+
+Protección:
+
+- header interno con secreto compartido
+- no pensados para exposición pública
+
+## Setup local
 
 ```bash
 cp .env.example .env
-npm install
-npm run start:dev
+yarn install
+yarn start:dev
+```
+
+Modo producción local:
+
+```bash
+yarn build
+yarn start:prod
 ```
 
 ## Demo seed
@@ -35,8 +68,17 @@ Si `AUTH_BOOTSTRAP_DEMO_DATA=true`, al arrancar crea:
 - password `123456`
 - membership `OWNER`
 
+## JWT
+
+- algoritmo: `HS256`
+- issuer: `auth`
+- audience esperada: `zerotrust-api`
+- access token corto
+- refresh token rotativo
+
 ## Notas
 
-- JWT: HS256
 - DB: PostgreSQL + TypeORM
-- `DB_SYNC=true` para desarrollo. Para producción, usar migraciones.
+- `DB_SYNC=true` sólo para desarrollo
+- para producción conviene migraciones explícitas
+- si cambia la autoridad de tenants/memberships, este servicio debe seguir siendo el dueño del dato

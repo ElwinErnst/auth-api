@@ -3,7 +3,7 @@ import { AccessTokenPayload } from '../../modules/auth/types/access-token-payloa
 
 export const CurrentAuth = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AccessTokenPayload => {
-    const request = ctx.switchToHttp().getRequest<{ user: AccessTokenPayload }>();
-    return request.user;
+    const request = ctx.switchToHttp().getRequest();
+    return request.user as AccessTokenPayload;
   },
 );

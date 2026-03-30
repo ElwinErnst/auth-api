@@ -1,52 +1,88 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { UsersService } from '../modules/users/users.service';
-import { TenantsService } from '../modules/tenants/tenants.service';
-import { MembershipsService } from '../modules/memberships/memberships.service';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+
+import { User } from '../modules/users/entities/user.entity';
+import { Tenant } from '../modules/tenants/entities/tenant.entity';
+import { TenantMembership } from '../modules/memberships/entities/tenant-membership.entity';
 
 @Injectable()
-export class DemoSeedService implements OnApplicationBootstrap {
+export class DemoSeedService implements OnModuleInit {
   private readonly logger = new Logger(DemoSeedService.name);
+  private readonly demoUserId = '925df4a7-ab30-4619-b2d5-7de62af7af6c';
+  private readonly demoTenantId = 'f4acaa72-d090-4cfb-9430-4f8585f58d86';
 
   constructor(
-    private readonly configService: ConfigService,
-    private readonly usersService: UsersService,
-    private readonly tenantsService: TenantsService,
-    private readonly membershipsService: MembershipsService,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
+    @InjectRepository(Tenant)
+    private readonly tenantsRepository: Repository<Tenant>,
+    @InjectRepository(TenantMembership)
+    private readonly membershipsRepository: Repository<TenantMembership>,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    const enabled =
-      this.configService.get<boolean>('auth.bootstrapDemoData') ?? false;
+  async onModuleInit(): Promise<void> {
+    await this.seed();
+  }
 
-    if (!enabled) {
-      return;
+  private async seed(): Promise<void> {
+    const email = 'admin@test.com';
+    const tenantSlug = 'sentinel-labs';
+
+    let tenant = await this.tenantsRepository.findOne({
+      where: { slug: tenantSlug },
+    });
+
+    if (!tenant) {
+      tenant = this.tenantsRepository.create({
+        id: this.demoTenantId,
+        name: 'Sentinel Labs',
+        slug: tenantSlug,
+        isActive: true,
+      });
+      tenant = await this.tenantsRepository.save(tenant);
+      this.logger.log(`Tenant created: ${tenant.slug}`);
     }
 
-    const tenant = await this.tenantsService.findOrCreateBySlug({
-      name: 'Sentinel Labs',
-      slug: 'sentinel-labs',
-      planCode: 'PRO',
-      ztPoliciesEnabled: true,
-      vaultsEnabled: true,
-      maxVaults: 3,
+    let user = await this.usersRepository.findOne({
+      where: { email },
     });
 
-    const user = await this.usersService.findOrCreateDemoUser({
-      email: 'admin@test.com',
-      password: '123456',
-      firstName: 'Admin',
-      lastName: 'Demo',
+    if (!user) {
+      const passwordHash = await bcrypt.hash('123456', 12);
+
+      user = this.usersRepository.create({
+        id: this.demoUserId,
+        email,
+        passwordHash,
+        firstName: 'Admin',
+        lastName: 'Demo',
+        isActive: true,
+      });
+      user = await this.usersRepository.save(user);
+      this.logger.log(`User created: ${user.email}`);
+    }
+
+    const membership = await this.membershipsRepository.findOne({
+      where: {
+        userId: user.id,
+        tenantId: tenant.id,
+      },
     });
 
-    await this.membershipsService.findOrCreate({
-      userId: user.id,
-      tenantId: tenant.id,
-      role: 'OWNER',
-    });
+    if (!membership) {
+      const newMembership = this.membershipsRepository.create({
+        userId: user.id,
+        tenantId: tenant.id,
+        role: 'OWNER',
+        isActive: true,
+      });
 
-    this.logger.log(
-      'Demo seed ready: admin@test.com / 123456 / tenant sentinel-labs',
-    );
+      await this.membershipsRepository.save(newMembership);
+      this.logger.log(`Membership created: ${user.email} -> ${tenant.slug}`);
+    }
+
+    this.logger.log('Demo seed completed');
   }
 }

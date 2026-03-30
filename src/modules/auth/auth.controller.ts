@@ -19,7 +19,7 @@ import { AccessTokenPayload } from './types/access-token-payload.type';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('login')
   login(
@@ -43,16 +43,19 @@ export class AuthController {
   logout(@Body() dto: LogoutDto) {
     return this.authService.logout(dto);
   }
-
   @UseGuards(AccessJwtGuard)
   @Post('logout-all')
   logoutAll(@CurrentAuth() currentAuth: AccessTokenPayload) {
-    return this.authService.logoutAll(currentAuth);
+    return this.authService.logoutAll(currentAuth.sub);
   }
 
   @UseGuards(AccessJwtGuard)
   @Get('me')
-  me(@CurrentAuth() currentAuth: AccessTokenPayload, @Req() _req: Request) {
-    return this.authService.me(currentAuth);
+  me(@CurrentAuth() currentAuth: AccessTokenPayload) {
+    return this.authService.me(
+      currentAuth.sub,
+      currentAuth.tenantId,
+      currentAuth.sessionId,
+    );
   }
 }

@@ -8,13 +8,15 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "seed:demo": "cross-env AUTH_BOOTSTRAP_DEMO_DATA=true nest start",
     "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",
     "migration:generate": "npm run typeorm -- migration:generate src/database/migrations/Init",
     "migration:run": "npm run typeorm -- migration:run",
-    "migration:revert": "npm run typeorm -- migration:revert"
+    "migration:revert": "npm run typeorm -- migration:revert",
+    "test:e2e": "jest --config ./tests/jest-e2e.json --runInBand"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.2",
@@ -42,10 +44,15 @@
     "@nestjs/testing": "^10.4.2",
     "@types/bcrypt": "^5.0.2",
     "@types/express": "^5.0.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.10.1",
     "@types/passport-jwt": "^4.0.1",
+    "@types/supertest": "^7.2.0",
     "eslint": "^9.14.0",
+    "jest": "^30.3.0",
     "prettier": "^3.3.3",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.3"
