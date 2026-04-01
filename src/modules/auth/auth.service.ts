@@ -48,7 +48,7 @@ export class AuthService {
     if (!tenantId && dto.tenantSlug) {
       const tenant = await this.tenantsService.findBySlug(dto.tenantSlug);
 
-      if (!tenant || !tenant.isActive) {
+      if (!tenant) {
         throw new UnauthorizedException('Tenant is required');
       }
 
@@ -72,8 +72,12 @@ export class AuthService {
       membership.tenant ??
       (await this.tenantsService.findById(membership.tenantId));
 
-    if (!tenant || !tenant.isActive) {
+    if (!tenant) {
       throw new UnauthorizedException('User has no access to this tenant');
+    }
+
+    if (!tenant.isActive && membership.role !== 'OWNER') {
+      throw new UnauthorizedException('Tenant is inactive');
     }
 
     const refreshExpiresAt = this.tokenService.buildRefreshExpiryDate();
@@ -142,6 +146,24 @@ export class AuthService {
         'membership_revoked',
       );
       throw new UnauthorizedException('Membership is no longer active');
+    }
+
+    const tenant = await this.tenantsService.findById(currentSession.tenantId);
+
+    if (!tenant) {
+      await this.sessionsService.revokeFamily(
+        currentSession.familyId,
+        'tenant_missing',
+      );
+      throw new UnauthorizedException('Tenant is no longer available');
+    }
+
+    if (!tenant.isActive && membership.role !== 'OWNER') {
+      await this.sessionsService.revokeFamily(
+        currentSession.familyId,
+        'tenant_inactive',
+      );
+      throw new UnauthorizedException('Tenant is inactive');
     }
 
     const refreshExpiresAt = this.tokenService.buildRefreshExpiryDate();
