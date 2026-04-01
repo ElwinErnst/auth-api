@@ -1,0 +1,191 @@
+import { Tenant } from '../tenants/entities/tenant.entity';
+
+export type EntitlementFeatureKey =
+  | 'vaults'
+  | 'ztPolicies'
+  | 'digitalNotary'
+  | 'auditExport'
+  | 'customBranding'
+  | 'sso';
+
+export type EntitlementLimitKey =
+  | 'maxVaults'
+  | 'maxUsers'
+  | 'auditRetentionDays'
+  | 'monthlyNotaryRequests';
+
+export type EntitlementCatalog = {
+  features: Record<EntitlementFeatureKey, boolean>;
+  limits: Record<EntitlementLimitKey, number | null>;
+  addonsAllowed: string[];
+};
+
+export type TenantEntitlements = {
+  planCode: string;
+  features: Record<EntitlementFeatureKey, boolean>;
+  limits: Record<EntitlementLimitKey, number | null>;
+  addonsAllowed: string[];
+  source: 'catalog' | 'catalog_with_legacy_overrides' | 'legacy_defaults';
+};
+
+export type TenantWithEntitlements = {
+  id: string;
+  name: string;
+  slug: string;
+  planCode: string | null;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  entitlements: TenantEntitlements;
+};
+
+export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
+  FREE: {
+    features: {
+      vaults: true,
+      ztPolicies: false,
+      digitalNotary: false,
+      auditExport: false,
+      customBranding: false,
+      sso: false,
+    },
+    limits: {
+      maxVaults: 1,
+      maxUsers: 3,
+      auditRetentionDays: 30,
+      monthlyNotaryRequests: 0,
+    },
+    addonsAllowed: [],
+  },
+  BASE: {
+    features: {
+      vaults: true,
+      ztPolicies: true,
+      digitalNotary: true,
+      auditExport: true,
+      customBranding: false,
+      sso: false,
+    },
+    limits: {
+      maxVaults: 3,
+      maxUsers: 10,
+      auditRetentionDays: 90,
+      monthlyNotaryRequests: 100,
+    },
+    addonsAllowed: ['extra_vaults', 'extra_users'],
+  },
+  GROWTH: {
+    features: {
+      vaults: true,
+      ztPolicies: true,
+      digitalNotary: false,
+      auditExport: true,
+      customBranding: false,
+      sso: false,
+    },
+    limits: {
+      maxVaults: 5,
+      maxUsers: 15,
+      auditRetentionDays: 90,
+      monthlyNotaryRequests: 100,
+    },
+    addonsAllowed: ['extra_vaults', 'extra_users'],
+  },
+  BUSINESS: {
+    features: {
+      vaults: true,
+      ztPolicies: true,
+      digitalNotary: true,
+      auditExport: true,
+      customBranding: true,
+      sso: false,
+    },
+    limits: {
+      maxVaults: 10,
+      maxUsers: 50,
+      auditRetentionDays: 365,
+      monthlyNotaryRequests: 1000,
+    },
+    addonsAllowed: ['extra_vaults', 'extra_users', 'extra_notary_volume'],
+  },
+  CUSTOM: {
+    features: {
+      vaults: true,
+      ztPolicies: true,
+      digitalNotary: true,
+      auditExport: true,
+      customBranding: true,
+      sso: true,
+    },
+    limits: {
+      maxVaults: null,
+      maxUsers: null,
+      auditRetentionDays: null,
+      monthlyNotaryRequests: null,
+    },
+    addonsAllowed: [
+      'extra_vaults',
+      'extra_users',
+      'extra_notary_volume',
+      'dedicated_support',
+    ],
+  },
+  ENTERPRISE: {
+    features: {
+      vaults: true,
+      ztPolicies: true,
+      digitalNotary: true,
+      auditExport: true,
+      customBranding: true,
+      sso: true,
+    },
+    limits: {
+      maxVaults: null,
+      maxUsers: null,
+      auditRetentionDays: null,
+      monthlyNotaryRequests: null,
+    },
+    addonsAllowed: [
+      'extra_vaults',
+      'extra_users',
+      'extra_notary_volume',
+      'dedicated_support',
+    ],
+  },
+};
+
+export const LEGACY_FALLBACK_PLAN: EntitlementCatalog = {
+  features: {
+    vaults: false,
+    ztPolicies: false,
+    digitalNotary: false,
+    auditExport: false,
+    customBranding: false,
+    sso: false,
+  },
+  limits: {
+    maxVaults: 0,
+    maxUsers: null,
+    auditRetentionDays: 30,
+    monthlyNotaryRequests: 0,
+  },
+  addonsAllowed: [],
+};
+
+export type TenantRecordLike = Pick<
+  Tenant,
+  | 'id'
+  | 'name'
+  | 'slug'
+  | 'planCode'
+  | 'ztPoliciesEnabled'
+  | 'vaultsEnabled'
+  | 'maxVaults'
+  | 'maxUsers'
+  | 'monthlyNotaryRequests'
+  | 'auditRetentionDays'
+> & {
+  isActive?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+};

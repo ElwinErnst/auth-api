@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { MembershipsModule } from '../memberships/memberships.module';
 import { SessionsModule } from '../sessions/sessions.module';
 import { TenantsModule } from '../tenants/tenants.module';
@@ -13,6 +14,7 @@ import { TokenService } from './token.service';
 @Module({
   imports: [
     JwtModule.register({}),
+    EntitlementsModule,
     UsersModule,
     TenantsModule,
     MembershipsModule,

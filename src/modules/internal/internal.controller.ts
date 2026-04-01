@@ -1,20 +1,25 @@
 import {
+  Body,
   Controller,
   Get,
   NotFoundException,
   Param,
+  Patch,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { InternalServiceGuard } from '../../common/guards/internal-service.guard';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 import { MembershipsService } from '../memberships/memberships.service';
 import { TenantsService } from '../tenants/tenants.service';
+import { UpdateTenantDto } from '../tenants/dto/update-tenant.dto';
 
 @Controller('internal')
 @UseGuards(InternalServiceGuard)
 export class InternalController {
   constructor(
     private readonly tenantsService: TenantsService,
+    private readonly entitlementsService: EntitlementsService,
     private readonly membershipsService: MembershipsService,
   ) {}
 
@@ -22,13 +27,22 @@ export class InternalController {
   async getTenantById(@Param('id') id: string) {
     const tenant = await this.tenantsService.findById(id);
 
-    return {
-      id: tenant.id,
-      name: tenant.name,
-      slug: tenant.slug,
-      planCode: tenant.planCode ?? null,
-      isActive: tenant.isActive,
-    };
+    return this.entitlementsService.attachToTenant(tenant);
+  }
+
+  @Get('tenants/:id/entitlements')
+  async getTenantEntitlements(@Param('id') id: string) {
+    const tenant = await this.tenantsService.findById(id);
+    return this.entitlementsService.resolveForTenant(tenant);
+  }
+
+  @Patch('tenants/:id')
+  async updateTenantInternally(
+    @Param('id') id: string,
+    @Body() dto: UpdateTenantDto,
+  ) {
+    const tenant = await this.tenantsService.update(id, dto);
+    return this.entitlementsService.attachToTenant(tenant);
   }
 
   @Get('memberships/resolve')
@@ -62,15 +76,9 @@ export class InternalController {
     const rows = await this.membershipsService.listByUser(userId);
 
     return rows.map((membership) => ({
-      id: membership.tenant.id,
-      name: membership.tenant.name,
-      slug: membership.tenant.slug,
-      planCode: membership.tenant.planCode ?? null,
-      isActive: membership.tenant.isActive,
+      ...this.entitlementsService.attachToTenant(membership.tenant),
       role: membership.role,
       membershipActive: membership.isActive,
-      createdAt: membership.tenant.createdAt.toISOString(),
-      updatedAt: membership.tenant.updatedAt.toISOString(),
     }));
   }
 }

@@ -27,6 +27,21 @@ export class UpdateTenantDto {
   maxVaults?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxUsers?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  monthlyNotaryRequests?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  auditRetentionDays?: number;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }

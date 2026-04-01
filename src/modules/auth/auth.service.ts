@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 import { MembershipsService } from '../memberships/memberships.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { TenantsService } from '../tenants/tenants.service';
@@ -16,6 +17,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly tenantsService: TenantsService,
+    private readonly entitlementsService: EntitlementsService,
     private readonly membershipsService: MembershipsService,
     private readonly sessionsService: SessionsService,
     private readonly passwordService: PasswordService,
@@ -221,6 +223,7 @@ export class AuthService {
       name: tenant.name,
       slug: tenant.slug,
       planCode: tenant.planCode ?? null,
+      entitlements: this.entitlementsService.resolveForTenant(tenant),
     },
     roles: [membership.role],
     sessionId: sessionId ?? null,

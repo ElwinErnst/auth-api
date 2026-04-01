@@ -32,6 +32,15 @@ export class Tenant {
   @Column({ name: 'max_vaults', type: 'int', default: 0 })
   maxVaults!: number;
 
+  @Column({ name: 'max_users', type: 'int', nullable: true })
+  maxUsers!: number | null;
+
+  @Column({ name: 'monthly_notary_requests', type: 'int', default: 0 })
+  monthlyNotaryRequests!: number;
+
+  @Column({ name: 'audit_retention_days', type: 'int', default: 30 })
+  auditRetentionDays!: number;
+
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
 

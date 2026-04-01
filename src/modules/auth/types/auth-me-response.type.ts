@@ -1,3 +1,5 @@
+import { TenantEntitlements } from '../../entitlements/entitlements.types';
+
 export type AuthMeResponse = {
   user: {
     id: string;
@@ -10,6 +12,7 @@ export type AuthMeResponse = {
     name: string;
     slug: string;
     planCode: string | null;
+    entitlements: TenantEntitlements;
   };
   roles: string[];
   sessionId: string | null;

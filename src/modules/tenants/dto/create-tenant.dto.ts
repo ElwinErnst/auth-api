@@ -23,4 +23,19 @@ export class CreateTenantDto {
   @IsInt()
   @Min(0)
   maxVaults?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxUsers?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  monthlyNotaryRequests?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  auditRetentionDays?: number;
 }

@@ -32,6 +32,9 @@ export class TenantsService {
       ztPoliciesEnabled: dto.ztPoliciesEnabled ?? false,
       vaultsEnabled: dto.vaultsEnabled ?? false,
       maxVaults: dto.maxVaults ?? 0,
+      maxUsers: dto.maxUsers ?? 3,
+      monthlyNotaryRequests: dto.monthlyNotaryRequests ?? 0,
+      auditRetentionDays: dto.auditRetentionDays ?? 30,
       isActive: true,
     });
 
@@ -75,6 +78,9 @@ export class TenantsService {
     ztPoliciesEnabled: boolean;
     vaultsEnabled: boolean;
     maxVaults: number;
+    maxUsers?: number;
+    monthlyNotaryRequests?: number;
+    auditRetentionDays?: number;
   }): Promise<Tenant> {
     const existing = await this.findBySlug(dto.slug);
     if (existing) {
@@ -84,6 +90,9 @@ export class TenantsService {
     return this.tenantsRepository.save(
       this.tenantsRepository.create({
         ...dto,
+        maxUsers: dto.maxUsers ?? 3,
+        monthlyNotaryRequests: dto.monthlyNotaryRequests ?? 0,
+        auditRetentionDays: dto.auditRetentionDays ?? 30,
         isActive: true,
       }),
     );

@@ -27,8 +27,16 @@ export class DemoSeedService implements OnModuleInit {
   }
 
   private async seed(): Promise<void> {
-    const email = 'admin@test.com';
     const tenantSlug = 'sentinel-labs';
+    const demoTenantDefaults = {
+      name: 'Sentinel Labs',
+      slug: tenantSlug,
+      planCode: 'BUSINESS',
+      ztPoliciesEnabled: true,
+      vaultsEnabled: true,
+      maxVaults: 10,
+      isActive: true,
+    } as const;
 
     let tenant = await this.tenantsRepository.findOne({
       where: { slug: tenantSlug },
@@ -37,50 +45,97 @@ export class DemoSeedService implements OnModuleInit {
     if (!tenant) {
       tenant = this.tenantsRepository.create({
         id: this.demoTenantId,
-        name: 'Sentinel Labs',
-        slug: tenantSlug,
-        isActive: true,
+        ...demoTenantDefaults,
       });
       tenant = await this.tenantsRepository.save(tenant);
       this.logger.log(`Tenant created: ${tenant.slug}`);
+    } else {
+      const needsTenantUpdate =
+        tenant.name !== demoTenantDefaults.name ||
+        tenant.planCode !== demoTenantDefaults.planCode ||
+        tenant.ztPoliciesEnabled !== demoTenantDefaults.ztPoliciesEnabled ||
+        tenant.vaultsEnabled !== demoTenantDefaults.vaultsEnabled ||
+        tenant.maxVaults !== demoTenantDefaults.maxVaults ||
+        tenant.isActive !== demoTenantDefaults.isActive;
+
+      if (needsTenantUpdate) {
+        Object.assign(tenant, demoTenantDefaults);
+        tenant = await this.tenantsRepository.save(tenant);
+        this.logger.log(`Tenant updated: ${tenant.slug}`);
+      }
     }
 
-    let user = await this.usersRepository.findOne({
-      where: { email },
-    });
-
-    if (!user) {
-      const passwordHash = await bcrypt.hash('123456', 12);
-
-      user = this.usersRepository.create({
+    const demoUsers = [
+      {
         id: this.demoUserId,
-        email,
-        passwordHash,
+        email: 'admin@test.com',
         firstName: 'Admin',
         lastName: 'Demo',
-        isActive: true,
-      });
-      user = await this.usersRepository.save(user);
-      this.logger.log(`User created: ${user.email}`);
-    }
-
-    const membership = await this.membershipsRepository.findOne({
-      where: {
-        userId: user.id,
-        tenantId: tenant.id,
+        role: 'OWNER' as const,
       },
-    });
+      {
+        id: 'f30f6213-4a8f-422a-87d9-34f0ee220001',
+        email: 'manager@test.com',
+        firstName: 'Manager',
+        lastName: 'Demo',
+        role: 'ADMIN' as const,
+      },
+      {
+        id: 'f30f6213-4a8f-422a-87d9-34f0ee220002',
+        email: 'member@test.com',
+        firstName: 'Member',
+        lastName: 'Demo',
+        role: 'MEMBER' as const,
+      },
+    ];
 
-    if (!membership) {
-      const newMembership = this.membershipsRepository.create({
-        userId: user.id,
-        tenantId: tenant.id,
-        role: 'OWNER',
-        isActive: true,
+    for (const demoUser of demoUsers) {
+      let user = await this.usersRepository.findOne({
+        where: { email: demoUser.email },
       });
 
-      await this.membershipsRepository.save(newMembership);
-      this.logger.log(`Membership created: ${user.email} -> ${tenant.slug}`);
+      if (!user) {
+        const passwordHash = await bcrypt.hash('123456', 12);
+
+        user = this.usersRepository.create({
+          id: demoUser.id,
+          email: demoUser.email,
+          passwordHash,
+          firstName: demoUser.firstName,
+          lastName: demoUser.lastName,
+          isActive: true,
+        });
+        user = await this.usersRepository.save(user);
+        this.logger.log(`User created: ${user.email}`);
+      }
+
+      const membership = await this.membershipsRepository.findOne({
+        where: {
+          userId: user.id,
+          tenantId: tenant.id,
+        },
+      });
+
+      if (!membership) {
+        const newMembership = this.membershipsRepository.create({
+          userId: user.id,
+          tenantId: tenant.id,
+          role: demoUser.role,
+          isActive: true,
+        });
+
+        await this.membershipsRepository.save(newMembership);
+        this.logger.log(
+          `Membership created: ${user.email} -> ${tenant.slug} (${demoUser.role})`,
+        );
+      } else if (membership.role !== demoUser.role || !membership.isActive) {
+        membership.role = demoUser.role;
+        membership.isActive = true;
+        await this.membershipsRepository.save(membership);
+        this.logger.log(
+          `Membership updated: ${user.email} -> ${tenant.slug} (${demoUser.role})`,
+        );
+      }
     }
 
     this.logger.log('Demo seed completed');

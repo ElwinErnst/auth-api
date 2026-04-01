@@ -1,6 +1,6 @@
 import {
   IsEmail,
-  // IsOptional,
+  IsOptional,
   IsString,
   MinLength,
   ValidateIf,
@@ -14,10 +14,12 @@ export class LoginDto {
   @MinLength(6)
   password!: string;
 
+  @IsOptional()
   @ValidateIf((o: LoginDto) => !o.tenantSlug)
   @IsString()
   tenantId?: string;
 
+  @IsOptional()
   @ValidateIf((o: LoginDto) => !o.tenantId)
   @IsString()
   tenantSlug?: string;

@@ -20,6 +20,7 @@ import { Session } from './modules/sessions/entities/session.entity';
 import { RolesGuard } from './common/guards/roles.guard';
 import { TenantScopeGuard } from './common/guards/tenant-scope.guard';
 import { InternalServiceGuard } from './common/guards/internal-service.guard';
+import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { InternalController } from './modules/internal/internal.controller';
 
 @Module({
@@ -62,6 +63,7 @@ import { InternalController } from './modules/internal/internal.controller';
     ]),
     UsersModule,
     TenantsModule,
+    EntitlementsModule,
     MembershipsModule,
     SessionsModule,
     AuthModule,
