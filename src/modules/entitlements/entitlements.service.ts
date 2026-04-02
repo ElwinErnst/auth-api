@@ -13,6 +13,7 @@ export class EntitlementsService {
     const normalizedPlanCode = (tenant.planCode ?? 'FREE').toUpperCase();
     const planCatalog =
       PLAN_ENTITLEMENTS[normalizedPlanCode] ?? LEGACY_FALLBACK_PLAN;
+    const apiAddons = this.normalizeApiAddons(tenant.apiAddons);
     const source =
       PLAN_ENTITLEMENTS[normalizedPlanCode] == null
         ? 'legacy_defaults'
@@ -33,6 +34,9 @@ export class EntitlementsService {
         ...planCatalog.features,
         vaults: tenant.vaultsEnabled,
         ztPolicies: tenant.ztPoliciesEnabled,
+        apiAuth: apiAddons.includes('AUTH_API'),
+        apiVault: apiAddons.includes('VAULT_API'),
+        apiZeroTrust: apiAddons.includes('ZERO_TRUST_API'),
       },
       limits: {
         ...planCatalog.limits,
@@ -44,6 +48,7 @@ export class EntitlementsService {
           tenant.auditRetentionDays ?? planCatalog.limits.auditRetentionDays,
       },
       addonsAllowed: [...planCatalog.addonsAllowed],
+      apiAddons,
       source,
     };
   }
@@ -63,5 +68,11 @@ export class EntitlementsService {
         : { updatedAt: tenant.updatedAt.toISOString() }),
       entitlements: this.resolveForTenant(tenant),
     };
+  }
+
+  private normalizeApiAddons(apiAddons?: string[] | null) {
+    const valid = new Set(['AUTH_API', 'VAULT_API', 'ZERO_TRUST_API']);
+    return [...new Set((apiAddons ?? []).filter((item) => valid.has(item)))] as
+      Array<'AUTH_API' | 'VAULT_API' | 'ZERO_TRUST_API'>;
   }
 }

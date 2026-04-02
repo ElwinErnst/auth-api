@@ -6,7 +6,15 @@ export type EntitlementFeatureKey =
   | 'digitalNotary'
   | 'auditExport'
   | 'customBranding'
-  | 'sso';
+  | 'sso'
+  | 'apiAuth'
+  | 'apiVault'
+  | 'apiZeroTrust';
+
+export type EntitlementApiAddonCode =
+  | 'AUTH_API'
+  | 'VAULT_API'
+  | 'ZERO_TRUST_API';
 
 export type EntitlementLimitKey =
   | 'maxVaults'
@@ -25,6 +33,7 @@ export type TenantEntitlements = {
   features: Record<EntitlementFeatureKey, boolean>;
   limits: Record<EntitlementLimitKey, number | null>;
   addonsAllowed: string[];
+  apiAddons: EntitlementApiAddonCode[];
   source: 'catalog' | 'catalog_with_legacy_overrides' | 'legacy_defaults';
 };
 
@@ -48,6 +57,9 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       auditExport: false,
       customBranding: false,
       sso: false,
+      apiAuth: false,
+      apiVault: false,
+      apiZeroTrust: false,
     },
     limits: {
       maxVaults: 1,
@@ -65,6 +77,9 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       auditExport: true,
       customBranding: false,
       sso: false,
+      apiAuth: false,
+      apiVault: false,
+      apiZeroTrust: false,
     },
     limits: {
       maxVaults: 3,
@@ -82,6 +97,9 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       auditExport: true,
       customBranding: false,
       sso: false,
+      apiAuth: false,
+      apiVault: false,
+      apiZeroTrust: false,
     },
     limits: {
       maxVaults: 5,
@@ -99,6 +117,9 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       auditExport: true,
       customBranding: true,
       sso: false,
+      apiAuth: false,
+      apiVault: false,
+      apiZeroTrust: false,
     },
     limits: {
       maxVaults: 10,
@@ -106,7 +127,14 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       auditRetentionDays: 365,
       monthlyNotaryRequests: 1000,
     },
-    addonsAllowed: ['extra_vaults', 'extra_users', 'extra_notary_volume'],
+    addonsAllowed: [
+      'extra_vaults',
+      'extra_users',
+      'extra_notary_volume',
+      'AUTH_API',
+      'VAULT_API',
+      'ZERO_TRUST_API',
+    ],
   },
   CUSTOM: {
     features: {
@@ -116,6 +144,9 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       auditExport: true,
       customBranding: true,
       sso: true,
+      apiAuth: false,
+      apiVault: false,
+      apiZeroTrust: false,
     },
     limits: {
       maxVaults: null,
@@ -128,6 +159,9 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       'extra_users',
       'extra_notary_volume',
       'dedicated_support',
+      'AUTH_API',
+      'VAULT_API',
+      'ZERO_TRUST_API',
     ],
   },
   ENTERPRISE: {
@@ -138,6 +172,9 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       auditExport: true,
       customBranding: true,
       sso: true,
+      apiAuth: false,
+      apiVault: false,
+      apiZeroTrust: false,
     },
     limits: {
       maxVaults: null,
@@ -150,6 +187,9 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       'extra_users',
       'extra_notary_volume',
       'dedicated_support',
+      'AUTH_API',
+      'VAULT_API',
+      'ZERO_TRUST_API',
     ],
   },
 };
@@ -162,6 +202,9 @@ export const LEGACY_FALLBACK_PLAN: EntitlementCatalog = {
     auditExport: false,
     customBranding: false,
     sso: false,
+    apiAuth: false,
+    apiVault: false,
+    apiZeroTrust: false,
   },
   limits: {
     maxVaults: 0,
@@ -184,6 +227,7 @@ export type TenantRecordLike = Pick<
   | 'maxUsers'
   | 'monthlyNotaryRequests'
   | 'auditRetentionDays'
+  | 'apiAddons'
 > & {
   isActive?: boolean;
   createdAt?: Date;

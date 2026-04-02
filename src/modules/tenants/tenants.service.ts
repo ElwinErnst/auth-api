@@ -35,6 +35,7 @@ export class TenantsService {
       maxUsers: dto.maxUsers ?? 3,
       monthlyNotaryRequests: dto.monthlyNotaryRequests ?? 0,
       auditRetentionDays: dto.auditRetentionDays ?? 30,
+      apiAddons: dto.apiAddons ?? [],
       isActive: true,
     });
 
@@ -81,6 +82,7 @@ export class TenantsService {
     maxUsers?: number;
     monthlyNotaryRequests?: number;
     auditRetentionDays?: number;
+    apiAddons?: Array<'AUTH_API' | 'VAULT_API' | 'ZERO_TRUST_API'>;
   }): Promise<Tenant> {
     const existing = await this.findBySlug(dto.slug);
     if (existing) {
@@ -93,6 +95,7 @@ export class TenantsService {
         maxUsers: dto.maxUsers ?? 3,
         monthlyNotaryRequests: dto.monthlyNotaryRequests ?? 0,
         auditRetentionDays: dto.auditRetentionDays ?? 30,
+        apiAddons: dto.apiAddons ?? [],
         isActive: true,
       }),
     );

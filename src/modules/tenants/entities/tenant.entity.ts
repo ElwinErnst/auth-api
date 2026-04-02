@@ -41,6 +41,9 @@ export class Tenant {
   @Column({ name: 'audit_retention_days', type: 'int', default: 30 })
   auditRetentionDays!: number;
 
+  @Column({ name: 'api_addons', type: 'simple-json', nullable: true })
+  apiAddons!: string[] | null;
+
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
 

@@ -1,4 +1,12 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CreateTenantDto {
   @IsString()
@@ -38,4 +46,9 @@ export class CreateTenantDto {
   @IsInt()
   @Min(0)
   auditRetentionDays?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(['AUTH_API', 'VAULT_API', 'ZERO_TRUST_API'], { each: true })
+  apiAddons?: Array<'AUTH_API' | 'VAULT_API' | 'ZERO_TRUST_API'>;
 }
