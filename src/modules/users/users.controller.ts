@@ -60,7 +60,8 @@ export class UsersController {
     @CurrentAuth() currentAuth: AccessTokenPayload,
   ) {
     const isPrivileged =
-      currentAuth.roles.includes('OWNER') || currentAuth.roles.includes('ADMIN');
+      currentAuth.roles.includes('OWNER') ||
+      currentAuth.roles.includes('ADMIN');
 
     if (!isPrivileged && currentAuth.sub !== id) {
       throw new ForbiddenException('You can only access your own user');
@@ -79,7 +80,8 @@ export class UsersController {
     @CurrentAuth() currentAuth: AccessTokenPayload,
   ) {
     const isPrivileged =
-      currentAuth.roles.includes('OWNER') || currentAuth.roles.includes('ADMIN');
+      currentAuth.roles.includes('OWNER') ||
+      currentAuth.roles.includes('ADMIN');
 
     if (!isPrivileged && currentAuth.sub !== id) {
       throw new ForbiddenException('You can only update your own user');

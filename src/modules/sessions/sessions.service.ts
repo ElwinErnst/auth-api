@@ -11,7 +11,7 @@ export class SessionsService {
     @InjectRepository(Session)
     private readonly sessionsRepository: Repository<Session>,
     private readonly passwordService: PasswordService,
-  ) { }
+  ) {}
 
   async createEmpty(params: {
     userId: string;

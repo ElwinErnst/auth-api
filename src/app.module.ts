@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import authConfig from './config/auth.config';
+import billingMeteringConfig from './config/billing-metering.config';
 import dbConfig from './config/db.config';
 import internalConfig from './config/internal.config';
 import jwtConfig from './config/jwt.config';
@@ -22,12 +23,15 @@ import { TenantScopeGuard } from './common/guards/tenant-scope.guard';
 import { InternalServiceGuard } from './common/guards/internal-service.guard';
 import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { InternalController } from './modules/internal/internal.controller';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { ClientApp } from './modules/integrations/entities/client-app.entity';
+import { ServiceAccount } from './modules/integrations/entities/service-account.entity';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [authConfig, dbConfig, jwtConfig, internalConfig],
+      load: [authConfig, billingMeteringConfig, dbConfig, jwtConfig, internalConfig],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -60,20 +64,23 @@ import { InternalController } from './modules/internal/internal.controller';
       Tenant,
       TenantMembership,
       Session,
+      ClientApp,
+      ServiceAccount,
     ]),
     UsersModule,
     TenantsModule,
     EntitlementsModule,
     MembershipsModule,
     SessionsModule,
+    IntegrationsModule,
     AuthModule,
   ],
   controllers: [InternalController],
   providers: [
-    DemoSeedService, 
+    DemoSeedService,
     InternalServiceGuard,
     RolesGuard,
-    TenantScopeGuard
+    TenantScopeGuard,
   ],
 })
-export class AppModule { }
+export class AppModule {}

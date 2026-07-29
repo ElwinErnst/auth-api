@@ -61,7 +61,10 @@ export class MembershipsService {
     return membership;
   }
 
-  async update(id: string, dto: UpdateMembershipDto): Promise<TenantMembership> {
+  async update(
+    id: string,
+    dto: UpdateMembershipDto,
+  ): Promise<TenantMembership> {
     const membership = await this.findById(id);
     Object.assign(membership, dto);
     return this.membershipsRepository.save(membership);

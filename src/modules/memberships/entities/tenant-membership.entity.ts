@@ -38,7 +38,9 @@ export class TenantMembership {
   @JoinColumn({ name: 'user_id' })
   user!: User;
 
-  @ManyToOne(() => Tenant, (tenant) => tenant.memberships, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Tenant, (tenant) => tenant.memberships, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'tenant_id' })
   tenant!: Tenant;
 

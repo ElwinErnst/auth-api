@@ -28,7 +28,6 @@ export class MembershipsController {
 
   @Get(':id')
   @Roles('OWNER', 'ADMIN')
-
   findById(@Param('id') id: string) {
     return this.membershipsService.findById(id);
   }

@@ -22,7 +22,7 @@ export class AuthService {
     private readonly sessionsService: SessionsService,
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
-  ) { }
+  ) {}
 
   async login(
     dto: LoginDto,
@@ -109,9 +109,13 @@ export class AuthService {
     dto: RefreshDto,
     context?: { userAgent?: string | null; ip?: string | null },
   ): Promise<TokenPair> {
-    const payload = await this.tokenService.verifyRefreshToken(dto.refreshToken);
+    const payload = await this.tokenService.verifyRefreshToken(
+      dto.refreshToken,
+    );
 
-    const currentSession = await this.sessionsService.findActiveById(payload.sid);
+    const currentSession = await this.sessionsService.findActiveById(
+      payload.sid,
+    );
 
     if (!currentSession) {
       throw new UnauthorizedException('Session is not active');
@@ -205,7 +209,9 @@ export class AuthService {
     }
 
     if (dto.refreshToken) {
-      const payload = await this.tokenService.verifyRefreshToken(dto.refreshToken);
+      const payload = await this.tokenService.verifyRefreshToken(
+        dto.refreshToken,
+      );
       await this.sessionsService.revokeById(payload.sid, 'logout');
       return;
     }
@@ -218,37 +224,38 @@ export class AuthService {
   }
 
   async me(
-  userId: string,
-  tenantId: string,
-  sessionId?: string | null,
-): Promise<AuthMeResponse> {
-  const user = await this.usersService.findById(userId);
-  const tenant = await this.tenantsService.findById(tenantId);
-  const membership = await this.membershipsService.findActiveMembership(
-    userId,
-    tenantId,
-  );
+    userId: string,
+    tenantId: string,
+    sessionId?: string | null,
+  ): Promise<AuthMeResponse> {
+    const user = await this.usersService.findById(userId);
+    const tenant = await this.tenantsService.findById(tenantId);
+    const membership = await this.membershipsService.findActiveMembership(
+      userId,
+      tenantId,
+    );
 
-  if (!user || !tenant || !membership) {
-    throw new UnauthorizedException('Profile not found');
+    if (!user || !tenant || !membership) {
+      throw new UnauthorizedException('Profile not found');
+    }
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName ?? null,
+        lastName: user.lastName ?? null,
+      },
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        planCode: tenant.planCode ?? null,
+        billingBypass: tenant.billingBypass,
+        entitlements: this.entitlementsService.resolveForTenant(tenant),
+      },
+      roles: [membership.role],
+      sessionId: sessionId ?? null,
+    };
   }
-
-  return {
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName ?? null,
-      lastName: user.lastName ?? null,
-    },
-    tenant: {
-      id: tenant.id,
-      name: tenant.name,
-      slug: tenant.slug,
-      planCode: tenant.planCode ?? null,
-      entitlements: this.entitlementsService.resolveForTenant(tenant),
-    },
-    roles: [membership.role],
-    sessionId: sessionId ?? null,
-  };
-}
 }
