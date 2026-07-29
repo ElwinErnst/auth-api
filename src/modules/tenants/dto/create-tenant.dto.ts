@@ -48,7 +48,21 @@ export class CreateTenantDto {
   auditRetentionDays?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxClientApps?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxServiceAccounts?: number;
+
+  @IsOptional()
   @IsArray()
   @IsIn(['AUTH_API', 'VAULT_API', 'ZERO_TRUST_API'], { each: true })
   apiAddons?: Array<'AUTH_API' | 'VAULT_API' | 'ZERO_TRUST_API'>;
+
+  @IsOptional()
+  @IsBoolean()
+  billingBypass?: boolean;
 }

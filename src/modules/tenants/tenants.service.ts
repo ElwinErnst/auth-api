@@ -35,7 +35,10 @@ export class TenantsService {
       maxUsers: dto.maxUsers ?? 3,
       monthlyNotaryRequests: dto.monthlyNotaryRequests ?? 0,
       auditRetentionDays: dto.auditRetentionDays ?? 30,
+      maxClientApps: dto.maxClientApps ?? 0,
+      maxServiceAccounts: dto.maxServiceAccounts ?? 0,
       apiAddons: dto.apiAddons ?? [],
+      billingBypass: dto.billingBypass ?? false,
       isActive: true,
     });
 
@@ -82,7 +85,10 @@ export class TenantsService {
     maxUsers?: number;
     monthlyNotaryRequests?: number;
     auditRetentionDays?: number;
+    maxClientApps?: number;
+    maxServiceAccounts?: number;
     apiAddons?: Array<'AUTH_API' | 'VAULT_API' | 'ZERO_TRUST_API'>;
+    billingBypass?: boolean;
   }): Promise<Tenant> {
     const existing = await this.findBySlug(dto.slug);
     if (existing) {
@@ -95,7 +101,10 @@ export class TenantsService {
         maxUsers: dto.maxUsers ?? 3,
         monthlyNotaryRequests: dto.monthlyNotaryRequests ?? 0,
         auditRetentionDays: dto.auditRetentionDays ?? 30,
+        maxClientApps: dto.maxClientApps ?? 0,
+        maxServiceAccounts: dto.maxServiceAccounts ?? 0,
         apiAddons: dto.apiAddons ?? [],
+        billingBypass: dto.billingBypass ?? false,
         isActive: true,
       }),
     );

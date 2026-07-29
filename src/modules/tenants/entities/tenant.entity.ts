@@ -41,8 +41,17 @@ export class Tenant {
   @Column({ name: 'audit_retention_days', type: 'int', default: 30 })
   auditRetentionDays!: number;
 
+  @Column({ name: 'max_client_apps', type: 'int', default: 0 })
+  maxClientApps!: number;
+
+  @Column({ name: 'max_service_accounts', type: 'int', default: 0 })
+  maxServiceAccounts!: number;
+
   @Column({ name: 'api_addons', type: 'simple-json', nullable: true })
   apiAddons!: string[] | null;
+
+  @Column({ name: 'billing_bypass', default: false })
+  billingBypass!: boolean;
 
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;

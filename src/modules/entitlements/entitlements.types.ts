@@ -20,7 +20,9 @@ export type EntitlementLimitKey =
   | 'maxVaults'
   | 'maxUsers'
   | 'auditRetentionDays'
-  | 'monthlyNotaryRequests';
+  | 'monthlyNotaryRequests'
+  | 'maxClientApps'
+  | 'maxServiceAccounts';
 
 export type EntitlementCatalog = {
   features: Record<EntitlementFeatureKey, boolean>;
@@ -34,7 +36,11 @@ export type TenantEntitlements = {
   limits: Record<EntitlementLimitKey, number | null>;
   addonsAllowed: string[];
   apiAddons: EntitlementApiAddonCode[];
-  source: 'catalog' | 'catalog_with_legacy_overrides' | 'legacy_defaults';
+  source:
+    | 'catalog'
+    | 'catalog_with_legacy_overrides'
+    | 'legacy_defaults'
+    | 'billing_bypass';
 };
 
 export type TenantWithEntitlements = {
@@ -42,6 +48,7 @@ export type TenantWithEntitlements = {
   name: string;
   slug: string;
   planCode: string | null;
+  billingBypass?: boolean;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -66,6 +73,8 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       maxUsers: 3,
       auditRetentionDays: 30,
       monthlyNotaryRequests: 0,
+      maxClientApps: 0,
+      maxServiceAccounts: 0,
     },
     addonsAllowed: [],
   },
@@ -86,6 +95,8 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       maxUsers: 10,
       auditRetentionDays: 90,
       monthlyNotaryRequests: 100,
+      maxClientApps: 0,
+      maxServiceAccounts: 0,
     },
     addonsAllowed: ['extra_vaults', 'extra_users'],
   },
@@ -106,6 +117,8 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       maxUsers: 15,
       auditRetentionDays: 90,
       monthlyNotaryRequests: 100,
+      maxClientApps: 0,
+      maxServiceAccounts: 0,
     },
     addonsAllowed: ['extra_vaults', 'extra_users'],
   },
@@ -126,6 +139,8 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       maxUsers: 50,
       auditRetentionDays: 365,
       monthlyNotaryRequests: 1000,
+      maxClientApps: 0,
+      maxServiceAccounts: 0,
     },
     addonsAllowed: [
       'extra_vaults',
@@ -153,6 +168,8 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       maxUsers: null,
       auditRetentionDays: null,
       monthlyNotaryRequests: null,
+      maxClientApps: null,
+      maxServiceAccounts: null,
     },
     addonsAllowed: [
       'extra_vaults',
@@ -181,6 +198,8 @@ export const PLAN_ENTITLEMENTS: Record<string, EntitlementCatalog> = {
       maxUsers: null,
       auditRetentionDays: null,
       monthlyNotaryRequests: null,
+      maxClientApps: null,
+      maxServiceAccounts: null,
     },
     addonsAllowed: [
       'extra_vaults',
@@ -211,6 +230,8 @@ export const LEGACY_FALLBACK_PLAN: EntitlementCatalog = {
     maxUsers: null,
     auditRetentionDays: 30,
     monthlyNotaryRequests: 0,
+    maxClientApps: 0,
+    maxServiceAccounts: 0,
   },
   addonsAllowed: [],
 };
@@ -226,8 +247,11 @@ export type TenantRecordLike = Pick<
   | 'maxVaults'
   | 'maxUsers'
   | 'monthlyNotaryRequests'
+  | 'maxClientApps'
+  | 'maxServiceAccounts'
   | 'auditRetentionDays'
   | 'apiAddons'
+  | 'billingBypass'
 > & {
   isActive?: boolean;
   createdAt?: Date;

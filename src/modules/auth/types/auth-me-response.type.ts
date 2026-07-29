@@ -12,6 +12,7 @@ export type AuthMeResponse = {
     name: string;
     slug: string;
     planCode: string | null;
+    billingBypass?: boolean;
     entitlements: TenantEntitlements;
   };
   roles: string[];
