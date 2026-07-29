@@ -3,17 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { durationToMilliseconds } from '../../common/utils/duration.util';
 import { AccessTokenPayload } from './types/access-token-payload.type';
+import type { JwtConfig } from './types/jwt-config.type';
 import { RefreshTokenPayload } from './types/refresh-token-payload.type';
 import { TokenPair } from './types/token-pair.type';
-
-type JwtConfig = {
-  issuer: string;
-  audience: string;
-  accessSecret: string;
-  refreshSecret: string;
-  accessExpiresIn: string;
-  refreshExpiresIn: string;
-};
 
 @Injectable()
 export class TokenService {
@@ -31,12 +23,22 @@ export class TokenService {
     tenantId: string;
     roles: string[];
     sessionId: string;
+    actorType?: 'user' | 'service_account';
+    clientAppId?: string;
+    serviceAccountId?: string;
   }): Promise<string> {
     const payload: AccessTokenPayload = {
       sub: params.userId,
       tenantId: params.tenantId,
       roles: params.roles,
       sessionId: params.sessionId,
+      actorType: params.actorType ?? 'user',
+      ...(params.clientAppId == null
+        ? {}
+        : { clientAppId: params.clientAppId }),
+      ...(params.serviceAccountId == null
+        ? {}
+        : { serviceAccountId: params.serviceAccountId }),
       type: 'access',
     };
 

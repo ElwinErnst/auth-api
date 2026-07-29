@@ -3,15 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AccessTokenPayload } from './types/access-token-payload.type';
-
-type JwtConfig = {
-  issuer: string;
-  audience: string;
-  accessSecret: string;
-};
+import type { JwtConfig } from './types/jwt-config.type';
 
 @Injectable()
-export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt-access') {
+export class JwtAccessStrategy extends PassportStrategy(
+  Strategy,
+  'jwt-access',
+) {
   constructor(private readonly configService: ConfigService) {
     const jwt = configService.get<JwtConfig>('jwt')!;
     super({
