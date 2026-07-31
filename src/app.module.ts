@@ -6,6 +6,7 @@ import billingMeteringConfig from './config/billing-metering.config';
 import dbConfig from './config/db.config';
 import internalConfig from './config/internal.config';
 import jwtConfig from './config/jwt.config';
+import webauthnConfig from './config/webauthn.config';
 import { buildTypeOrmConfig } from './database/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -26,12 +27,15 @@ import { InternalController } from './modules/internal/internal.controller';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { ClientApp } from './modules/integrations/entities/client-app.entity';
 import { ServiceAccount } from './modules/integrations/entities/service-account.entity';
+import { PasskeysModule } from './modules/passkeys/passkeys.module';
+import { UserPasskey } from './modules/passkeys/entities/user-passkey.entity';
+import { WebauthnChallenge } from './modules/passkeys/entities/webauthn-challenge.entity';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [authConfig, billingMeteringConfig, dbConfig, jwtConfig, internalConfig],
+      load: [authConfig, billingMeteringConfig, dbConfig, jwtConfig, internalConfig, webauthnConfig],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -66,6 +70,8 @@ import { ServiceAccount } from './modules/integrations/entities/service-account.
       Session,
       ClientApp,
       ServiceAccount,
+      UserPasskey,
+      WebauthnChallenge,
     ]),
     UsersModule,
     TenantsModule,
@@ -74,6 +80,7 @@ import { ServiceAccount } from './modules/integrations/entities/service-account.
     SessionsModule,
     IntegrationsModule,
     AuthModule,
+    PasskeysModule,
   ],
   controllers: [InternalController],
   providers: [
