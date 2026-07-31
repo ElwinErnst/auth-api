@@ -19,6 +19,7 @@ import type {
   RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import { MembershipsService } from '../memberships/memberships.service';
+import { SessionAnomalyService } from '../session-anomaly/session-anomaly.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { TokenService } from '../auth/token.service';
@@ -53,6 +54,7 @@ export class PasskeysService {
     private readonly sessionsService: SessionsService,
     private readonly tokenService: TokenService,
     private readonly configService: ConfigService,
+    private readonly anomalyService: SessionAnomalyService,
   ) {
     this.webauthn = this.configService.get<WebauthnConfig>('webauthn')!;
   }
@@ -235,6 +237,15 @@ export class PasskeysService {
       expiresAt: refreshExpiresAt,
       userAgent: context?.userAgent ?? null,
       ip: context?.ip ?? null,
+    });
+
+    await this.anomalyService.analyze({
+      userId: passkey.userId,
+      tenantId: tenant.id,
+      sessionId: session.id,
+      ip: context?.ip ?? null,
+      userAgent: context?.userAgent ?? null,
+      loginKind: 'passkey',
     });
 
     const tokenPair = await this.tokenService.generateTokenPair({

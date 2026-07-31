@@ -30,6 +30,8 @@ import { ServiceAccount } from './modules/integrations/entities/service-account.
 import { PasskeysModule } from './modules/passkeys/passkeys.module';
 import { UserPasskey } from './modules/passkeys/entities/user-passkey.entity';
 import { WebauthnChallenge } from './modules/passkeys/entities/webauthn-challenge.entity';
+import { SessionAnomalyModule } from './modules/session-anomaly/session-anomaly.module';
+import { SessionAnomalyEvent } from './modules/session-anomaly/entities/session-anomaly-event.entity';
 
 @Module({
   imports: [
@@ -72,12 +74,14 @@ import { WebauthnChallenge } from './modules/passkeys/entities/webauthn-challeng
       ServiceAccount,
       UserPasskey,
       WebauthnChallenge,
+      SessionAnomalyEvent,
     ]),
     UsersModule,
     TenantsModule,
     EntitlementsModule,
     MembershipsModule,
     SessionsModule,
+    SessionAnomalyModule,
     IntegrationsModule,
     AuthModule,
     PasskeysModule,

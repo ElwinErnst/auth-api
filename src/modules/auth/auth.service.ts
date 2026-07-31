@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { MembershipsService } from '../memberships/memberships.service';
+import { SessionAnomalyService } from '../session-anomaly/session-anomaly.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { UsersService } from '../users/users.service';
@@ -22,6 +23,7 @@ export class AuthService {
     private readonly sessionsService: SessionsService,
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
+    private readonly anomalyService: SessionAnomalyService,
   ) {}
 
   async login(
@@ -88,6 +90,15 @@ export class AuthService {
       expiresAt: refreshExpiresAt,
       userAgent: context?.userAgent ?? null,
       ip: context?.ip ?? null,
+    });
+
+    await this.anomalyService.analyze({
+      userId: user.id,
+      tenantId: membership.tenantId,
+      sessionId: session.id,
+      ip: context?.ip ?? null,
+      userAgent: context?.userAgent ?? null,
+      loginKind: 'password',
     });
 
     const tokenPair = await this.tokenService.generateTokenPair({
