@@ -1,14 +1,20 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThanOrEqual, Not, Repository } from 'typeorm';
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
+
+const GRACE_WINDOW_HOURS = 24;
+const MIN_ROTATION_INTERVAL_DAYS = 1;
+const MAX_ROTATION_INTERVAL_DAYS = 365;
 import { BillingMeteringService } from '../../common/modules/billing-metering/billing-metering.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { TenantsService } from '../tenants/tenants.service';
@@ -24,6 +30,7 @@ import { IssueServiceAccountTokenDto } from './dto/issue-service-account-token.d
 @Injectable()
 export class IntegrationsService {
   private readonly scrypt = promisify(scryptCallback);
+  private readonly logger = new Logger(IntegrationsService.name);
 
   constructor(
     @InjectRepository(ClientApp)
@@ -202,13 +209,103 @@ export class IntegrationsService {
   async rotateServiceAccountSecret(tenantId: string, serviceAccountId: string) {
     await this.assertAuthApiEnabled(tenantId);
     const account = await this.findServiceAccount(tenantId, serviceAccountId);
+    return this.rotateInternal(account, 'manual');
+  }
+
+  async setRotationPolicy(
+    tenantId: string,
+    serviceAccountId: string,
+    intervalDays: number | null,
+  ) {
+    await this.assertAuthApiEnabled(tenantId);
+    const account = await this.findServiceAccount(tenantId, serviceAccountId);
+
+    if (intervalDays !== null) {
+      if (
+        !Number.isInteger(intervalDays) ||
+        intervalDays < MIN_ROTATION_INTERVAL_DAYS ||
+        intervalDays > MAX_ROTATION_INTERVAL_DAYS
+      ) {
+        throw new BadRequestException(
+          `rotationIntervalDays must be between ${MIN_ROTATION_INTERVAL_DAYS} and ${MAX_ROTATION_INTERVAL_DAYS}`,
+        );
+      }
+      account.rotationIntervalDays = intervalDays;
+      account.nextRotationAt = new Date(
+        Date.now() + intervalDays * 86400 * 1000,
+      );
+    } else {
+      account.rotationIntervalDays = null;
+      account.nextRotationAt = null;
+    }
+
+    return this.toServiceAccount(
+      await this.serviceAccountsRepository.save(account),
+    );
+  }
+
+  async autoRotateDue(): Promise<{ rotated: number }> {
+    const now = new Date();
+    const due = await this.serviceAccountsRepository.find({
+      where: {
+        rotationIntervalDays: Not(null as unknown as number),
+        nextRotationAt: LessThanOrEqual(now),
+        isActive: true,
+      },
+      take: 100,
+    });
+
+    let rotated = 0;
+    for (const account of due) {
+      try {
+        await this.rotateInternal(account, 'scheduled');
+        rotated += 1;
+      } catch (err) {
+        this.logger.error(
+          `auto-rotate failed for service_account=${account.id}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    if (rotated > 0) {
+      this.logger.log(`auto-rotated ${rotated} service account secret(s)`);
+    }
+
+    return { rotated };
+  }
+
+  private async rotateInternal(
+    account: ServiceAccount,
+    trigger: 'manual' | 'scheduled',
+  ) {
+    const previousHash = account.secretHash;
 
     const plainSecret = this.generateSecret();
     account.secretHash = await this.hashSecret(plainSecret);
     account.secretPreview = `••••${plainSecret.slice(-6)}`;
     account.lastUsedAt = null;
 
+    // Keep the previous secret valid for GRACE_WINDOW_HOURS so callers
+    // that still hold it have time to migrate without an outage.
+    account.previousSecretHash = previousHash;
+    account.previousSecretExpiresAt = new Date(
+      Date.now() + GRACE_WINDOW_HOURS * 3600 * 1000,
+    );
+
+    // Reschedule next rotation if an auto policy is in place.
+    if (account.rotationIntervalDays !== null) {
+      account.nextRotationAt = new Date(
+        Date.now() + account.rotationIntervalDays * 86400 * 1000,
+      );
+    }
+
     const saved = await this.serviceAccountsRepository.save(account);
+
+    this.logger.log(
+      `rotated service_account=${account.id} trigger=${trigger} grace_hours=${GRACE_WINDOW_HOURS}`,
+    );
 
     return {
       serviceAccount: this.toServiceAccount(saved),
@@ -263,9 +360,33 @@ export class IntegrationsService {
       dto.clientSecret,
       account.secretHash,
     );
+    let usedPreviousSecret = false;
+
     if (!secretOk) {
-      await this.registerTokenFailure(account);
-      throw new UnauthorizedException('Invalid service account credentials');
+      // Grace window: accept the previous secret if it hasn't expired yet,
+      // so callers rotating their credential store don't hit an outage.
+      const previousStillValid =
+        account.previousSecretHash &&
+        account.previousSecretExpiresAt &&
+        account.previousSecretExpiresAt.getTime() > Date.now();
+
+      if (previousStillValid) {
+        const prevOk = await this.verifySecret(
+          dto.clientSecret,
+          account.previousSecretHash!,
+        );
+        if (prevOk) {
+          usedPreviousSecret = true;
+          this.logger.warn(
+            `service_account=${account.id} authenticated with previous secret; grace_expires_at=${account.previousSecretExpiresAt!.toISOString()}`,
+          );
+        }
+      }
+
+      if (!usedPreviousSecret) {
+        await this.registerTokenFailure(account);
+        throw new UnauthorizedException('Invalid service account credentials');
+      }
     }
 
     await this.clearTokenFailures(account);
@@ -441,6 +562,13 @@ export class IntegrationsService {
       createdByUserId: account.createdByUserId,
       isActive: account.isActive,
       lastUsedAt: account.lastUsedAt,
+      rotationIntervalDays: account.rotationIntervalDays,
+      nextRotationAt: account.nextRotationAt,
+      previousSecretActiveUntil:
+        account.previousSecretExpiresAt &&
+        account.previousSecretExpiresAt.getTime() > Date.now()
+          ? account.previousSecretExpiresAt
+          : null,
       createdAt: account.createdAt,
       updatedAt: account.updatedAt,
     };

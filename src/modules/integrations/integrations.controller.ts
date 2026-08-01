@@ -19,6 +19,7 @@ import { UpdateClientAppDto } from './dto/update-client-app.dto';
 import { CreateServiceAccountDto } from './dto/create-service-account.dto';
 import { UpdateServiceAccountDto } from './dto/update-service-account.dto';
 import { IssueServiceAccountTokenDto } from './dto/issue-service-account-token.dto';
+import { SetRotationPolicyDto } from './dto/set-rotation-policy.dto';
 
 @Controller()
 export class IntegrationsController {
@@ -109,6 +110,21 @@ export class IntegrationsController {
     return this.integrationsService.rotateServiceAccountSecret(
       tenantId,
       serviceAccountId,
+    );
+  }
+
+  @Patch('tenants/:tenantId/service-accounts/:serviceAccountId/rotation-policy')
+  @UseGuards(AccessJwtGuard, RolesGuard, TenantScopeGuard)
+  @Roles('OWNER', 'ADMIN')
+  setRotationPolicy(
+    @Param('tenantId') tenantId: string,
+    @Param('serviceAccountId') serviceAccountId: string,
+    @Body() dto: SetRotationPolicyDto,
+  ) {
+    return this.integrationsService.setRotationPolicy(
+      tenantId,
+      serviceAccountId,
+      dto.rotationIntervalDays ?? null,
     );
   }
 

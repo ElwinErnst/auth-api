@@ -8,6 +8,7 @@ import { ClientApp } from './entities/client-app.entity';
 import { ServiceAccount } from './entities/service-account.entity';
 import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
+import { SecretRotationCron } from './secret-rotation.cron';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { IntegrationsService } from './integrations.service';
     AuthModule,
   ],
   controllers: [IntegrationsController],
-  providers: [IntegrationsService, BillingMeteringService],
+  providers: [IntegrationsService, BillingMeteringService, SecretRotationCron],
   exports: [IntegrationsService],
 })
 export class IntegrationsModule {}

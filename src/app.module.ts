@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import authConfig from './config/auth.config';
 import billingMeteringConfig from './config/billing-metering.config';
@@ -39,6 +40,7 @@ import { SessionAnomalyEvent } from './modules/session-anomaly/entities/session-
       isGlobal: true,
       load: [authConfig, billingMeteringConfig, dbConfig, jwtConfig, internalConfig, webauthnConfig],
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
