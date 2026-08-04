@@ -67,9 +67,11 @@ function makeRepos() {
 }
 
 // The argument of the most recent .save() call (the final persisted state).
-function lastSaveArg(save: { mock: { calls: unknown[][] } }): any {
+function lastSaveArg(save: {
+  mock: { calls: unknown[][] };
+}): SessionAnomalyClassification {
   const { calls } = save.mock;
-  return calls[calls.length - 1][0];
+  return calls[calls.length - 1][0] as SessionAnomalyClassification;
 }
 
 describe('AnomalyClassifierService', () => {
@@ -126,7 +128,11 @@ describe('AnomalyClassifierService', () => {
     expect(result.outputTokens).toBe(25);
 
     // Thinking must be disabled so the small token budget isn't spent reasoning.
-    const params = create.mock.calls[0][0];
+    const params = (create.mock.calls as unknown[][])[0][0] as {
+      thinking: unknown;
+      model: string;
+      output_config: { format: { type: string } };
+    };
     expect(params.thinking).toEqual({ type: 'disabled' });
     expect(params.model).toBe('claude-sonnet-5');
     expect(params.output_config.format.type).toBe('json_schema');
