@@ -202,6 +202,11 @@ export class AnomalyClassifierService {
     const response = await this.client.messages.create({
       model: this.config.model,
       max_tokens: this.config.maxTokens,
+      // Disabled on purpose: on current Sonnet/Opus models, omitting `thinking`
+      // runs adaptive thinking, which would spend the small max_tokens budget on
+      // reasoning and risk truncating the JSON output. A schema-constrained
+      // classification does not need it; this keeps it fast and cheap.
+      thinking: { type: 'disabled' },
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userContent }],
       output_config: {
