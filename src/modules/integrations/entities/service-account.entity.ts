@@ -58,6 +58,26 @@ export class ServiceAccount {
   @Column({ name: 'auth_blocked_until', type: 'timestamp', nullable: true })
   authBlockedUntil!: Date | null;
 
+  // Automatic rotation policy. Null = no auto rotation (manual only).
+  @Column({ name: 'rotation_interval_days', type: 'int', nullable: true })
+  rotationIntervalDays!: number | null;
+
+  // Scheduled next rotation. Recomputed on every rotate from now + interval.
+  @Column({ name: 'next_rotation_at', type: 'timestamptz', nullable: true })
+  nextRotationAt!: Date | null;
+
+  // Previous secret hash, valid for the grace window right after a rotation
+  // so callers that still hold the old secret can migrate without downtime.
+  @Column({ name: 'previous_secret_hash', type: 'text', nullable: true })
+  previousSecretHash!: string | null;
+
+  @Column({
+    name: 'previous_secret_expires_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  previousSecretExpiresAt!: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 
