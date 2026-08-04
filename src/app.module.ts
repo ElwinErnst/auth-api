@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import authConfig from './config/auth.config';
@@ -8,6 +9,7 @@ import dbConfig from './config/db.config';
 import internalConfig from './config/internal.config';
 import jwtConfig from './config/jwt.config';
 import webauthnConfig from './config/webauthn.config';
+import anomalyClassifierConfig from './config/anomaly-classifier.config';
 import { buildTypeOrmConfig } from './database/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -33,14 +35,24 @@ import { UserPasskey } from './modules/passkeys/entities/user-passkey.entity';
 import { WebauthnChallenge } from './modules/passkeys/entities/webauthn-challenge.entity';
 import { SessionAnomalyModule } from './modules/session-anomaly/session-anomaly.module';
 import { SessionAnomalyEvent } from './modules/session-anomaly/entities/session-anomaly-event.entity';
+import { SessionAnomalyClassification } from './modules/session-anomaly/entities/session-anomaly-classification.entity';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [authConfig, billingMeteringConfig, dbConfig, jwtConfig, internalConfig, webauthnConfig],
+      load: [
+        authConfig,
+        billingMeteringConfig,
+        dbConfig,
+        jwtConfig,
+        internalConfig,
+        webauthnConfig,
+        anomalyClassifierConfig,
+      ],
     }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
@@ -77,6 +89,7 @@ import { SessionAnomalyEvent } from './modules/session-anomaly/entities/session-
       UserPasskey,
       WebauthnChallenge,
       SessionAnomalyEvent,
+      SessionAnomalyClassification,
     ]),
     UsersModule,
     TenantsModule,

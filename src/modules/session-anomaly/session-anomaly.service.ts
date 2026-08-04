@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Not, Repository } from 'typeorm';
 import * as geoip from 'geoip-lite';
@@ -7,6 +8,10 @@ import {
   AnomalySeverity,
   SessionAnomalyEvent,
 } from './entities/session-anomaly-event.entity';
+import {
+  ANOMALY_PERSISTED_EVENT,
+  AnomalyPersistedEvent,
+} from './types/anomaly-persisted.event';
 
 const HISTORY_WINDOW_DAYS = 90;
 const WARNING_THRESHOLD = 40;
@@ -38,6 +43,7 @@ export class SessionAnomalyService {
     private readonly events: Repository<SessionAnomalyEvent>,
     @InjectRepository(Session)
     private readonly sessions: Repository<Session>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async analyze(input: AnalyzeInput): Promise<AnomalyResult> {
@@ -49,6 +55,12 @@ export class SessionAnomalyService {
 
     const flags: string[] = [];
     let score = 0;
+
+    // Distinct-count summary of the history window, forwarded to the LLM
+    // classifier so it never has to query the sessions table itself.
+    let distinctIps = 0;
+    let distinctCountries = 0;
+    let distinctUserAgents = 0;
 
     // Load recent history (successful sessions from the last N days).
     // The session we're analyzing has already been persisted by the caller
@@ -85,6 +97,10 @@ export class SessionAnomalyService {
         const fp = fingerprintUserAgent(s.userAgent);
         if (fp) seenUaFingerprints.add(fp);
       }
+
+      distinctIps = seenIps.size;
+      distinctCountries = seenCountries.size;
+      distinctUserAgents = seenUaFingerprints.size;
 
       if (normalizedIp && !seenIps.has(normalizedIp)) {
         flags.push('new_ip');
@@ -128,6 +144,18 @@ export class SessionAnomalyService {
       this.logger.warn(
         `Session anomaly [${severity}] user=${input.userId} score=${score} flags=${flags.join(',')} ip=${normalizedIp} country=${country}`,
       );
+
+      // Fire-and-forget: hand the persisted event to the LLM classifier off
+      // the login path. A classifier failure never affects authentication.
+      this.eventEmitter.emit(ANOMALY_PERSISTED_EVENT, {
+        eventId: row.id,
+        history: {
+          total: history.length,
+          distinctIps,
+          distinctCountries,
+          distinctUserAgents,
+        },
+      } satisfies AnomalyPersistedEvent);
     }
 
     return { score, flags, severity, country, city };
@@ -157,7 +185,8 @@ function fingerprintUserAgent(ua: string | null | undefined): string | null {
     ua.match(/(Chrome|Firefox|Safari|Edge|Opera|CriOS|FxiOS)/i)?.[1] ??
     'unknown';
   const os =
-    ua.match(/(Windows|Mac OS X|Macintosh|Linux|Android|iPhone|iPad|iOS)/i)?.[1] ??
-    'unknown';
+    ua.match(
+      /(Windows|Mac OS X|Macintosh|Linux|Android|iPhone|iPad|iOS)/i,
+    )?.[1] ?? 'unknown';
   return `${browser.toLowerCase()}|${os.toLowerCase()}`;
 }
