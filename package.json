@@ -12,6 +12,7 @@
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "seed:demo": "cross-env AUTH_BOOTSTRAP_DEMO_DATA=true nest start",
+    "test": "jest --config ./tests/jest-unit.json",
     "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",
     "migration:generate": "npm run typeorm -- migration:generate src/database/migrations/Init",
     "migration:run": "npm run typeorm -- migration:run",
