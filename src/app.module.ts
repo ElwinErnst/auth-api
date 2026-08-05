@@ -10,6 +10,7 @@ import internalConfig from './config/internal.config';
 import jwtConfig from './config/jwt.config';
 import webauthnConfig from './config/webauthn.config';
 import anomalyClassifierConfig from './config/anomaly-classifier.config';
+import accessReviewConfig from './config/access-review.config';
 import { buildTypeOrmConfig } from './database/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -36,6 +37,8 @@ import { WebauthnChallenge } from './modules/passkeys/entities/webauthn-challeng
 import { SessionAnomalyModule } from './modules/session-anomaly/session-anomaly.module';
 import { SessionAnomalyEvent } from './modules/session-anomaly/entities/session-anomaly-event.entity';
 import { SessionAnomalyClassification } from './modules/session-anomaly/entities/session-anomaly-classification.entity';
+import { AccessReviewModule } from './modules/access-review/access-review.module';
+import { TenantAccessReview } from './modules/access-review/entities/tenant-access-review.entity';
 
 @Module({
   imports: [
@@ -49,6 +52,7 @@ import { SessionAnomalyClassification } from './modules/session-anomaly/entities
         internalConfig,
         webauthnConfig,
         anomalyClassifierConfig,
+        accessReviewConfig,
       ],
     }),
     ScheduleModule.forRoot(),
@@ -90,6 +94,7 @@ import { SessionAnomalyClassification } from './modules/session-anomaly/entities
       WebauthnChallenge,
       SessionAnomalyEvent,
       SessionAnomalyClassification,
+      TenantAccessReview,
     ]),
     UsersModule,
     TenantsModule,
@@ -100,6 +105,7 @@ import { SessionAnomalyClassification } from './modules/session-anomaly/entities
     IntegrationsModule,
     AuthModule,
     PasskeysModule,
+    AccessReviewModule,
   ],
   controllers: [InternalController],
   providers: [
