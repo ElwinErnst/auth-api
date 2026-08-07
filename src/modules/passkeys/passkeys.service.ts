@@ -142,20 +142,22 @@ export class PasskeysService {
 
   async authenticationBegin(email: string, tenantSlug: string) {
     const user = await this.usersService.findByEmailWithMemberships(email);
-    const tenant = await this.tenantsService.findBySlug(tenantSlug);
 
-    // Do not leak whether the user exists — always return options.
-    const credentials =
-      user && tenant
-        ? await this.passkeys.find({ where: { userId: user.id } })
-        : [];
-
+    // Enumeration resistance: return the SAME options shape whether or not the
+    // account exists. We deliberately do NOT list the user's registered
+    // passkeys in `allowCredentials` — a populated list discloses that this
+    // email has an account (and which authenticators it uses), which is exactly
+    // the enumeration oracle we want to avoid. Registration uses
+    // residentKey:'preferred', so the browser offers the user's discoverable
+    // passkeys from the platform; a non-existent email simply has none to offer.
+    //
+    // Tradeoff: a non-discoverable credential (a rare FIDO2 key registered
+    // without a resident key) will not be auto-targeted here. That is the
+    // accepted cost of not leaking account existence. `tenantSlug` is validated
+    // at finish, not here.
     const options = await generateAuthenticationOptions({
       rpID: this.webauthn.rpID,
-      allowCredentials: credentials.map((c) => ({
-        id: c.credentialId.toString('base64url'),
-        transports: c.transports as AuthenticatorTransportFuture[],
-      })),
+      allowCredentials: [],
       userVerification: 'preferred',
     });
 
