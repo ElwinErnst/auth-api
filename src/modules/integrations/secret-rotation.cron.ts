@@ -8,7 +8,7 @@ export class SecretRotationCron {
 
   constructor(private readonly integrations: IntegrationsService) {}
 
-  // Runs every 15 minutes. Rotations that are due within that window get
+  // Runs every 10 minutes. Rotations that are due within that window get
   // picked up on the next tick. The rotation itself is idempotent — if a
   // secret was already rotated between the query and the update, the
   // nextRotationAt has advanced past `now` and it's just skipped.
