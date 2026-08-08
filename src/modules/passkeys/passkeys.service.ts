@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { EntityManager, IsNull, LessThan, Repository } from 'typeorm';
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -80,8 +80,8 @@ export class PasskeysService {
         transports: c.transports as AuthenticatorTransportFuture[],
       })),
       authenticatorSelection: {
-        residentKey: 'preferred',
-        userVerification: 'preferred',
+        residentKey: 'required',
+        userVerification: 'required',
       },
     });
 
@@ -98,65 +98,70 @@ export class PasskeysService {
       throw new BadRequestException('friendlyName is required');
     }
 
-    const stored = await this.consumeChallenge('registration', userId);
-
-    const verification = await verifyRegistrationResponse({
-      response,
-      expectedChallenge: stored.challenge,
-      expectedOrigin: this.webauthn.origins,
-      expectedRPID: this.webauthn.rpID,
-      requireUserVerification: false,
-    });
-
-    if (!verification.verified || !verification.registrationInfo) {
-      throw new UnauthorizedException('Passkey registration failed');
-    }
-
-    const info = verification.registrationInfo;
-    const credentialIdBuf = Buffer.from(info.credential.id, 'base64url');
-
-    const duplicate = await this.passkeys.findOne({
-      where: { credentialId: credentialIdBuf },
-    });
-    if (duplicate) {
-      throw new BadRequestException('This passkey is already registered');
-    }
-
-    const row = this.passkeys.create({
+    const saved = await this.withChallenge(
+      'registration',
       userId,
-      credentialId: credentialIdBuf,
-      publicKey: Buffer.from(info.credential.publicKey),
-      counter: String(info.credential.counter ?? 0),
-      transports: (info.credential.transports ?? []) as string[],
-      deviceType: info.credentialDeviceType,
-      backedUp: info.credentialBackedUp,
-      friendlyName: friendlyName.trim().slice(0, 80),
-      lastUsedAt: null,
-    });
+      async (stored, manager) => {
+        const verification = await verifyRegistrationResponse({
+          response,
+          expectedChallenge: stored.challenge,
+          expectedOrigin: this.webauthn.origins,
+          expectedRPID: this.webauthn.rpID,
+          requireUserVerification: true,
+        });
 
-    const saved = await this.passkeys.save(row);
+        if (!verification.verified || !verification.registrationInfo) {
+          throw new UnauthorizedException('Passkey registration failed');
+        }
+
+        const info = verification.registrationInfo;
+        const credentialIdBuf = Buffer.from(info.credential.id, 'base64url');
+        const passkeys = manager.getRepository(UserPasskey);
+        const duplicate = await passkeys.findOne({
+          where: { credentialId: credentialIdBuf },
+        });
+        if (duplicate) {
+          throw new BadRequestException('This passkey is already registered');
+        }
+
+        const row = passkeys.create({
+          userId,
+          credentialId: credentialIdBuf,
+          publicKey: Buffer.from(info.credential.publicKey),
+          counter: String(info.credential.counter ?? 0),
+          transports: (info.credential.transports ?? []) as string[],
+          deviceType: info.credentialDeviceType,
+          backedUp: info.credentialBackedUp,
+          friendlyName: friendlyName.trim().slice(0, 80),
+          lastUsedAt: null,
+        });
+        return passkeys.save(row);
+      },
+    );
     return this.toSummary(saved);
   }
 
   // ── Authentication ─────────────────────────────────────────────
 
   async authenticationBegin(email: string, tenantSlug: string) {
+    const startedAt = performance.now();
     const user = await this.usersService.findByEmailWithMemberships(email);
-    const tenant = await this.tenantsService.findBySlug(tenantSlug);
 
-    // Do not leak whether the user exists — always return options.
-    const credentials =
-      user && tenant
-        ? await this.passkeys.find({ where: { userId: user.id } })
-        : [];
-
+    // Enumeration resistance: return the SAME options shape whether or not the
+    // account exists. We deliberately do NOT list the user's registered
+    // passkeys in `allowCredentials` — a populated list discloses that this
+    // email has an account (and which authenticators it uses), which is exactly
+    // the enumeration oracle we want to avoid. Registration uses
+    // residentKey:'required', so the browser offers the user's discoverable
+    // passkeys from the platform; a non-existent email simply has none to offer.
+    //
+    // Registration requires discoverable credentials, so every credential
+    // created by this application can be selected without disclosing IDs here.
+    // `tenantSlug` is validated at finish, not here.
     const options = await generateAuthenticationOptions({
       rpID: this.webauthn.rpID,
-      allowCredentials: credentials.map((c) => ({
-        id: c.credentialId.toString('base64url'),
-        transports: c.transports as AuthenticatorTransportFuture[],
-      })),
-      userVerification: 'preferred',
+      allowCredentials: [],
+      userVerification: 'required',
     });
 
     await this.saveChallenge(
@@ -164,6 +169,8 @@ export class PasskeysService {
       user?.id ?? null,
       options.challenge,
     );
+
+    await this.waitForAuthenticationBeginFloor(startedAt);
 
     return options;
   }
@@ -179,38 +186,56 @@ export class PasskeysService {
       where: { credentialId: credentialIdBuf },
     });
     if (!passkey) throw new UnauthorizedException('Unknown passkey');
+    const verifiedPasskey = await this.withChallenge(
+      'authentication',
+      passkey.userId,
+      async (stored, manager) => {
+        const passkeys = manager.getRepository(UserPasskey);
+        const lockedPasskey = await passkeys.findOne({
+          where: { id: passkey.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!lockedPasskey) throw new UnauthorizedException('Unknown passkey');
 
-    const stored = await this.consumeChallenge('authentication', passkey.userId);
+        const storedCounter = this.parseAuthenticatorCounter(
+          lockedPasskey.counter,
+        );
+        const verification = await verifyAuthenticationResponse({
+          response,
+          expectedChallenge: stored.challenge,
+          expectedOrigin: this.webauthn.origins,
+          expectedRPID: this.webauthn.rpID,
+          credential: {
+            id: response.id,
+            publicKey: new Uint8Array(lockedPasskey.publicKey),
+            counter: storedCounter,
+            transports:
+              lockedPasskey.transports as AuthenticatorTransportFuture[],
+          },
+          requireUserVerification: true,
+        });
 
-    const verification = await verifyAuthenticationResponse({
-      response,
-      expectedChallenge: stored.challenge,
-      expectedOrigin: this.webauthn.origins,
-      expectedRPID: this.webauthn.rpID,
-      credential: {
-        id: response.id,
-        publicKey: new Uint8Array(passkey.publicKey),
-        counter: Number(passkey.counter),
-        transports: passkey.transports as AuthenticatorTransportFuture[],
+        if (!verification.verified) {
+          throw new UnauthorizedException('Passkey authentication failed');
+        }
+
+        const newCounter = verification.authenticationInfo.newCounter;
+        if (!Number.isSafeInteger(newCounter) || newCounter < 0) {
+          throw new UnauthorizedException(
+            'Authenticator counter is outside the supported range',
+          );
+        }
+        if (newCounter <= storedCounter && newCounter !== 0) {
+          throw new UnauthorizedException(
+            'Authenticator counter did not advance (possible cloned key)',
+          );
+        }
+
+        lockedPasskey.counter = String(newCounter);
+        lockedPasskey.lastUsedAt = new Date();
+        return passkeys.save(lockedPasskey);
       },
-      requireUserVerification: false,
-    });
-
-    if (!verification.verified) {
-      throw new UnauthorizedException('Passkey authentication failed');
-    }
-
-    const newCounter = verification.authenticationInfo.newCounter;
-    if (newCounter <= Number(passkey.counter) && newCounter !== 0) {
-      // Cloned authenticator or replay — burn all passkeys of this user.
-      throw new UnauthorizedException(
-        'Authenticator counter did not advance (possible cloned key)',
-      );
-    }
-
-    passkey.counter = String(newCounter);
-    passkey.lastUsedAt = new Date();
-    await this.passkeys.save(passkey);
+    );
 
     // From here mirror the tail of auth.service.login: resolve tenant,
     // membership, create session, sign token pair.
@@ -218,7 +243,7 @@ export class PasskeysService {
     if (!tenant) throw new UnauthorizedException('Tenant is required');
 
     const membership = await this.membershipsService.findActiveMembership(
-      passkey.userId,
+      verifiedPasskey.userId,
       tenant.id,
     );
     if (!membership) {
@@ -232,7 +257,7 @@ export class PasskeysService {
     const refreshExpiresAt = this.tokenService.buildRefreshExpiryDate();
 
     const session = await this.sessionsService.createEmpty({
-      userId: passkey.userId,
+      userId: verifiedPasskey.userId,
       tenantId: tenant.id,
       expiresAt: refreshExpiresAt,
       userAgent: context?.userAgent ?? null,
@@ -240,7 +265,7 @@ export class PasskeysService {
     });
 
     await this.anomalyService.analyze({
-      userId: passkey.userId,
+      userId: verifiedPasskey.userId,
       tenantId: tenant.id,
       sessionId: session.id,
       ip: context?.ip ?? null,
@@ -314,22 +339,63 @@ export class PasskeysService {
     await this.challenges.save(row);
   }
 
-  private async consumeChallenge(
+  private async withChallenge<T>(
     kind: 'registration' | 'authentication',
     userId: string | null,
-  ): Promise<WebauthnChallenge> {
-    const row = await this.challenges.findOne({
-      where: { kind, userId: userId ?? undefined },
-      order: { createdAt: 'DESC' },
+    verify: (
+      challenge: WebauthnChallenge,
+      manager: EntityManager,
+    ) => Promise<T>,
+  ): Promise<T> {
+    return this.challenges.manager.transaction(async (manager) => {
+      // Serialize the whole read/verify/delete sequence before PostgreSQL takes
+      // the SELECT statement snapshot. FOR UPDATE alone can let a waiter retain
+      // a snapshot of a row deleted by the transaction it waited for.
+      await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+        `${kind}:${userId ?? 'anonymous'}`,
+      ]);
+      const challenges = manager.getRepository(WebauthnChallenge);
+      const row = await challenges.findOne({
+        where: { kind, userId: userId === null ? IsNull() : userId },
+        order: { createdAt: 'DESC' },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!row) throw new UnauthorizedException('No challenge in progress');
+      if (row.expiresAt.getTime() < Date.now()) {
+        await challenges.remove(row);
+        throw new UnauthorizedException('Challenge expired');
+      }
+
+      // The row lock serializes concurrent finishes. A failed verification
+      // rolls the transaction back and leaves the challenge available; a
+      // successful verification deletes it in the same commit as state updates.
+      const result = await verify(row, manager);
+      await challenges.remove(row);
+      return result;
     });
-    if (!row) throw new UnauthorizedException('No challenge in progress');
-    if (row.expiresAt.getTime() < Date.now()) {
-      await this.challenges.remove(row);
-      throw new UnauthorizedException('Challenge expired');
+  }
+
+  private parseAuthenticatorCounter(value: string): number {
+    if (!/^\d+$/.test(value)) {
+      throw new UnauthorizedException('Invalid authenticator counter');
     }
-    // Single-use.
-    await this.challenges.remove(row);
-    return row;
+    const counter = Number(value);
+    if (!Number.isSafeInteger(counter)) {
+      throw new UnauthorizedException(
+        'Authenticator counter is outside the supported range',
+      );
+    }
+    return counter;
+  }
+
+  private async waitForAuthenticationBeginFloor(startedAt: number): Promise<void> {
+    const minimum = this.webauthn.authenticationBeginMinDurationMs;
+    if (!Number.isFinite(minimum) || minimum <= 0) return;
+
+    const remaining = minimum - (performance.now() - startedAt);
+    if (remaining > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remaining));
+    }
   }
 
   private toSummary(row: UserPasskey): PasskeySummary {

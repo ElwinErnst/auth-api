@@ -5,6 +5,7 @@ export type WebauthnConfig = {
   rpName: string;
   origins: string[];
   challengeTtlMs: number;
+  authenticationBeginMinDurationMs: number;
 };
 
 export default registerAs<WebauthnConfig>('webauthn', () => {
@@ -20,5 +21,8 @@ export default registerAs<WebauthnConfig>('webauthn', () => {
     rpName: process.env.WEBAUTHN_RP_NAME ?? 'Sytadel',
     origins,
     challengeTtlMs: Number(process.env.WEBAUTHN_CHALLENGE_TTL_MS ?? 300000),
+    authenticationBeginMinDurationMs: Number(
+      process.env.WEBAUTHN_AUTHENTICATION_BEGIN_MIN_DURATION_MS ?? 250,
+    ),
   };
 });
