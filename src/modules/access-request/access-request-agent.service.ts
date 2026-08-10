@@ -1,12 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  Annotation,
-  END,
-  START,
-  StateGraph,
-} from '@langchain/langgraph';
+import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 
 import type { AccessRequestConfig } from '../../config/access-request.config';
 import { AccessReviewSnapshotService } from '../access-review/access-review-snapshot.service';
@@ -81,8 +76,7 @@ export class AccessRequestAgentService {
     @Inject(AccessReviewSnapshotService)
     private readonly snapshots: AccessReviewSnapshotService,
   ) {
-    this.config =
-      this.configService.get<AccessRequestConfig>('accessRequest')!;
+    this.config = this.configService.get<AccessRequestConfig>('accessRequest')!;
     this.client =
       this.config.enabled && this.config.apiKey
         ? new Anthropic({
