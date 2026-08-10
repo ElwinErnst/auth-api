@@ -13,6 +13,7 @@ import jwtConfig from './config/jwt.config';
 import webauthnConfig from './config/webauthn.config';
 import anomalyClassifierConfig from './config/anomaly-classifier.config';
 import accessReviewConfig from './config/access-review.config';
+import accessRequestConfig from './config/access-request.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
@@ -38,6 +39,7 @@ import { SessionAnomalyModule } from './modules/session-anomaly/session-anomaly.
 import { SessionAnomalyEvent } from './modules/session-anomaly/entities/session-anomaly-event.entity';
 import { SessionAnomalyClassification } from './modules/session-anomaly/entities/session-anomaly-classification.entity';
 import { AccessReviewModule } from './modules/access-review/access-review.module';
+import { AccessRequestModule } from './modules/access-request/access-request.module';
 import { TenantAccessReview } from './modules/access-review/entities/tenant-access-review.entity';
 
 @Module({
@@ -53,6 +55,7 @@ import { TenantAccessReview } from './modules/access-review/entities/tenant-acce
         webauthnConfig,
         anomalyClassifierConfig,
         accessReviewConfig,
+        accessRequestConfig,
       ],
     }),
     ScheduleModule.forRoot(),
@@ -106,6 +109,7 @@ import { TenantAccessReview } from './modules/access-review/entities/tenant-acce
     AuthModule,
     PasskeysModule,
     AccessReviewModule,
+    AccessRequestModule,
 
     // Per-IP rate limiting (300 req/min default, tunable via env). Uses the
     // real client IP thanks to `trust proxy` set in main.ts.
