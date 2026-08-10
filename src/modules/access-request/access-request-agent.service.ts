@@ -57,7 +57,9 @@ const RESPONSE_SCHEMA = {
   properties: {
     recommendation: { type: 'string', enum: ['allow', 'deny'] },
     reasoning: { type: 'string', minLength: 1, maxLength: 800 },
-    confidence: { type: 'number', minimum: 0, maximum: 1 },
+    // Anthropic structured output rejects minimum/maximum on numbers; the 0..1
+    // range is stated in the prompt and clamped client-side below.
+    confidence: { type: 'number' },
   },
 } as const;
 
@@ -177,7 +179,11 @@ export class AccessRequestAgentService {
           `Agent returned no text block (stop_reason=${response.stop_reason})`,
         );
       }
-      const proposal = JSON.parse(textBlock.text) as AccessRequestProposal;
+      const parsed = JSON.parse(textBlock.text) as AccessRequestProposal;
+      const proposal: AccessRequestProposal = {
+        ...parsed,
+        confidence: Math.min(1, Math.max(0, Number(parsed.confidence) || 0)),
+      };
       return { proposal };
     };
 
