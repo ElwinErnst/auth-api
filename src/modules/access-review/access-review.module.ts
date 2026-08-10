@@ -28,6 +28,6 @@ import { TenantAccessReview } from './entities/tenant-access-review.entity';
   ],
   controllers: [AccessReviewController],
   providers: [AccessReviewService, AccessReviewSnapshotService, AccessReviewCron],
-  exports: [AccessReviewService],
+  exports: [AccessReviewService, AccessReviewSnapshotService],
 })
 export class AccessReviewModule {}
