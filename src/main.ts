@@ -1,9 +1,13 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+
+  // Security headers (HSTS, X-Content-Type-Options, frameguard, etc.).
+  app.use(helmet());
 
   // Trust reverse proxies (docker network, gateway, cloudfront) so that
   // req.ip reflects the real client IP from X-Forwarded-For instead of

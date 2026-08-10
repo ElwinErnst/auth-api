@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import authConfig from './config/auth.config';
 import billingMeteringConfig from './config/billing-metering.config';
@@ -11,14 +13,12 @@ import jwtConfig from './config/jwt.config';
 import webauthnConfig from './config/webauthn.config';
 import anomalyClassifierConfig from './config/anomaly-classifier.config';
 import accessReviewConfig from './config/access-review.config';
-import { buildTypeOrmConfig } from './database/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { MembershipsModule } from './modules/memberships/memberships.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { DemoSeedService } from './database/demo-seed.service';
-import { Type } from 'class-transformer';
 import { Tenant } from './modules/tenants/entities/tenant.entity';
 import { User } from './modules/users/entities/user.entity';
 import { TenantMembership } from './modules/memberships/entities/tenant-membership.entity';
@@ -106,6 +106,15 @@ import { TenantAccessReview } from './modules/access-review/entities/tenant-acce
     AuthModule,
     PasskeysModule,
     AccessReviewModule,
+
+    // Per-IP rate limiting (300 req/min default, tunable via env). Uses the
+    // real client IP thanks to `trust proxy` set in main.ts.
+    ThrottlerModule.forRoot([
+      {
+        ttl: Number(process.env.THROTTLE_TTL_MS ?? 60_000),
+        limit: Number(process.env.THROTTLE_LIMIT ?? 300),
+      },
+    ]),
   ],
   controllers: [InternalController],
   providers: [
@@ -113,6 +122,7 @@ import { TenantAccessReview } from './modules/access-review/entities/tenant-acce
     InternalServiceGuard,
     RolesGuard,
     TenantScopeGuard,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}
