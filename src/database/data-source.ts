@@ -1,10 +1,12 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { User } from '../modules/users/entities/user.entity';
-import { Tenant } from '../modules/tenants/entities/tenant.entity';
-import { TenantMembership } from '../modules/memberships/entities/tenant-membership.entity';
-import { Session } from '../modules/sessions/entities/session.entity';
 
+/**
+ * TypeORM DataSource used by the CLI (migration:generate / run / revert).
+ * Entities are picked up by glob so every `*.entity.ts` is included — the
+ * generated baseline must cover the whole schema, not a hand-maintained subset.
+ * The running app configures TypeORM separately in app.module.ts.
+ */
 export default new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST ?? 'localhost',
@@ -12,6 +14,6 @@ export default new DataSource({
   username: process.env.DB_USER ?? 'postgres',
   password: process.env.DB_PASS ?? 'postgres',
   database: process.env.DB_NAME ?? 'auth',
-  entities: [User, Tenant, TenantMembership, Session],
+  entities: ['src/**/*.entity.ts'],
   migrations: ['src/database/migrations/*.ts'],
 });

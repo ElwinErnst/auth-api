@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -72,8 +73,6 @@ import { TenantAccessReview } from './modules/access-review/entities/tenant-acce
           synchronize: boolean;
         }>('db')!;
 
-        console.log('DB CONFIG =>', db);
-
         return {
           type: 'postgres' as const,
           host: db.host,
@@ -83,6 +82,10 @@ import { TenantAccessReview } from './modules/access-review/entities/tenant-acce
           database: db.database,
           autoLoadEntities: true,
           synchronize: db.synchronize,
+          // Run pending migrations on boot. Compiled migrations live next to
+          // this module under dist/database/migrations after `nest build`.
+          migrations: [join(__dirname, 'database', 'migrations', '*.js')],
+          migrationsRun: true,
         };
       },
     }),
