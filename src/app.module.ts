@@ -42,6 +42,7 @@ import { SessionAnomalyClassification } from './modules/session-anomaly/entities
 import { AccessReviewModule } from './modules/access-review/access-review.module';
 import { AccessRequestModule } from './modules/access-request/access-request.module';
 import { TenantAccessReview } from './modules/access-review/entities/tenant-access-review.entity';
+import { ReplayModule } from './common/replay/replay.module';
 
 @Module({
   imports: [
@@ -113,6 +114,7 @@ import { TenantAccessReview } from './modules/access-review/entities/tenant-acce
     PasskeysModule,
     AccessReviewModule,
     AccessRequestModule,
+    ReplayModule,
 
     // Per-IP rate limiting (300 req/min default, tunable via env). Uses the
     // real client IP thanks to `trust proxy` set in main.ts.
