@@ -18,6 +18,9 @@ export class JwtAccessStrategy extends PassportStrategy(
       issuer: jwt.issuer,
       audience: jwt.audience,
       ignoreExpiration: false,
+      // Pin the algorithm so a token can't be presented under a different
+      // (e.g. "none") alg. HS256 is the only algorithm we issue with.
+      algorithms: ['HS256'],
     });
   }
 

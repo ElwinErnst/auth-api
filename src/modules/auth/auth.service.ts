@@ -33,6 +33,9 @@ export class AuthService {
     const user = await this.usersService.findByEmailWithMemberships(dto.email);
 
     if (!user || !user.isActive) {
+      // Equalize timing so an unknown/inactive email is indistinguishable from
+      // a wrong password (both pay one bcrypt comparison).
+      await this.passwordService.dummyVerify(dto.password);
       throw new UnauthorizedException('Invalid credentials');
     }
 
