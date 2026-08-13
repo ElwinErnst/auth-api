@@ -5,9 +5,9 @@ import {
   Headers,
   Ip,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { CurrentAuth } from '../../common/decorators/current-auth.decorator';
 import { AccessJwtGuard } from '../../common/guards/access-jwt.guard';
@@ -21,6 +21,9 @@ import { AccessTokenPayload } from './types/access-token-payload.type';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Credential brute-force guard: much stricter than the global 300/min. bcrypt
+  // slows each guess; this caps the volume per IP on top of that.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('login')
   login(
     @Body() dto: LoginDto,
@@ -30,6 +33,7 @@ export class AuthController {
     return this.authService.login(dto, { userAgent, ip });
   }
 
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('refresh')
   refresh(
     @Body() dto: RefreshDto,
