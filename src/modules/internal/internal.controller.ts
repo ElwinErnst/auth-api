@@ -13,6 +13,7 @@ import { EntitlementsService } from '../entitlements/entitlements.service';
 import { MembershipsService } from '../memberships/memberships.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { UpdateTenantDto } from '../tenants/dto/update-tenant.dto';
+import { TenantPoliciesService } from '../tenant-policies/tenant-policies.service';
 
 @Controller('internal')
 @UseGuards(InternalServiceGuard)
@@ -21,6 +22,7 @@ export class InternalController {
     private readonly tenantsService: TenantsService,
     private readonly entitlementsService: EntitlementsService,
     private readonly membershipsService: MembershipsService,
+    private readonly tenantPoliciesService: TenantPoliciesService,
   ) {}
 
   @Get('tenants/:id')
@@ -34,6 +36,15 @@ export class InternalController {
   async getTenantEntitlements(@Param('id') id: string) {
     const tenant = await this.tenantsService.findById(id);
     return this.entitlementsService.resolveForTenant(tenant);
+  }
+
+  @Get('tenants/:id/policy')
+  async getTenantPolicy(@Param('id') id: string) {
+    const published = await this.tenantPoliciesService.getPublished(id);
+    if (!published) {
+      throw new NotFoundException('No published policy for this tenant');
+    }
+    return published;
   }
 
   @Patch('tenants/:id')
