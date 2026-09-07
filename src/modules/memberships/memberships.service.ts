@@ -45,9 +45,15 @@ export class MembershipsService {
     );
   }
 
-  async findById(id: string): Promise<TenantMembership> {
+  async findById(
+    id: string,
+    tenantId: string,
+  ): Promise<TenantMembership> {
+    // Scope the lookup by the caller's tenant so a membership belonging to
+    // another tenant is indistinguishable from a non-existent one (404),
+    // preventing cross-tenant enumeration/modification (BOLA).
     const membership = await this.membershipsRepository.findOne({
-      where: { id },
+      where: { id, tenantId },
       relations: {
         user: true,
         tenant: true,
@@ -64,8 +70,9 @@ export class MembershipsService {
   async update(
     id: string,
     dto: UpdateMembershipDto,
+    tenantId: string,
   ): Promise<TenantMembership> {
-    const membership = await this.findById(id);
+    const membership = await this.findById(id, tenantId);
     Object.assign(membership, dto);
     return this.membershipsRepository.save(membership);
   }

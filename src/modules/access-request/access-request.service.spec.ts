@@ -138,7 +138,7 @@ describe('AccessRequestService', () => {
 
     await service.approve('tenant-1', 'ar-1', 'admin-9');
 
-    expect(membershipUpdate).toHaveBeenCalledWith('m-1', { role: 'ADMIN' });
+    expect(membershipUpdate).toHaveBeenCalledWith('m-1', { role: 'ADMIN' }, 'tenant-1');
     expect(membershipCreate).not.toHaveBeenCalled();
   });
 

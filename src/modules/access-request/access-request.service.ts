@@ -85,7 +85,7 @@ export class AccessRequestService {
       request.tenantId,
     );
     if (existing) {
-      await this.memberships.update(existing.id, { role });
+      await this.memberships.update(existing.id, { role }, request.tenantId);
     } else {
       await this.memberships.create({
         userId: request.requesterUserId,
