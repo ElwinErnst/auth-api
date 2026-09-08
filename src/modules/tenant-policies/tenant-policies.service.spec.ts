@@ -7,11 +7,17 @@ const ACTOR = '99999999-9999-9999-9999-999999999999';
 
 // Plain-object mock (not typed as Repository) so asserting on repo.findOne does
 // not trip @typescript-eslint/unbound-method; cast only when constructing.
-type RepoMock = { findOne: jest.Mock; create: jest.Mock; save: jest.Mock };
+type RepoMock = {
+  findOne: jest.Mock;
+  find: jest.Mock;
+  create: jest.Mock;
+  save: jest.Mock;
+};
 
 function makeRepoMock(): RepoMock {
   return {
     findOne: jest.fn(),
+    find: jest.fn(),
     create: jest.fn((x: unknown) => x),
     save: jest.fn((x: unknown) => Promise.resolve(x)),
   };
@@ -79,5 +85,23 @@ describe('TenantPoliciesService', () => {
     // new published version = previous + 1
     expect(result.version).toBe(3);
     expect(result.status).toBe('published');
+  });
+});
+
+describe('TenantPoliciesService.listVersions', () => {
+  it('returns the tenant version history ordered by version desc', async () => {
+    const repo = makeRepoMock();
+    const rows = [
+      { id: 'r3', tenantId: TENANT, version: 3, status: 'published' },
+      { id: 'r2', tenantId: TENANT, version: 2, status: 'archived' },
+    ] as TenantPolicyVersion[];
+    repo.find.mockResolvedValueOnce(rows);
+    const svc = serviceFor(repo);
+
+    await expect(svc.listVersions(TENANT)).resolves.toBe(rows);
+    expect(repo.find).toHaveBeenCalledWith({
+      where: { tenantId: TENANT },
+      order: { version: 'DESC' },
+    });
   });
 });
