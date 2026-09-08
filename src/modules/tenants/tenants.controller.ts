@@ -46,34 +46,40 @@ export class TenantsController {
     return this.entitlementsService.attachToTenant(tenant);
   }
 
-  @Get(':id')
+  // Routes use `:tenantId` (not `:id`) on purpose: TenantScopeGuard only
+  // enforces caller-vs-path tenant matching when the path param is named
+  // `tenantId`. Naming it `:id` silently disables the guard (cross-tenant BOLA).
+  @Get(':tenantId')
   @UseGuards(AccessJwtGuard, RolesGuard, TenantScopeGuard)
   @Roles('OWNER', 'ADMIN', 'MEMBER')
-  async findOne(@Param('id') id: string) {
-    const tenant = await this.tenantsService.findById(id);
+  async findOne(@Param('tenantId') tenantId: string) {
+    const tenant = await this.tenantsService.findById(tenantId);
     return this.entitlementsService.attachToTenant(tenant);
   }
 
-  @Patch(':id')
+  @Patch(':tenantId')
   @UseGuards(AccessJwtGuard, RolesGuard, TenantScopeGuard)
   @Roles('OWNER')
-  async update(@Param('id') id: string, @Body() dto: UpdateTenantDto) {
-    const tenant = await this.tenantsService.update(id, dto);
+  async update(
+    @Param('tenantId') tenantId: string,
+    @Body() dto: UpdateTenantDto,
+  ) {
+    const tenant = await this.tenantsService.update(tenantId, dto);
     return this.entitlementsService.attachToTenant(tenant);
   }
 
-  @Get(':id/memberships')
+  @Get(':tenantId/memberships')
   @UseGuards(AccessJwtGuard, RolesGuard, TenantScopeGuard)
   @Roles('OWNER', 'ADMIN')
-  getMemberships(@Param('id') id: string) {
-    return this.membershipsService.listByTenant(id);
+  getMemberships(@Param('tenantId') tenantId: string) {
+    return this.membershipsService.listByTenant(tenantId);
   }
 
-  @Get(':id/entitlements')
+  @Get(':tenantId/entitlements')
   @UseGuards(AccessJwtGuard, RolesGuard, TenantScopeGuard)
   @Roles('OWNER', 'ADMIN', 'MEMBER')
-  async getEntitlements(@Param('id') id: string) {
-    const tenant = await this.tenantsService.findById(id);
+  async getEntitlements(@Param('tenantId') tenantId: string) {
+    const tenant = await this.tenantsService.findById(tenantId);
     return this.entitlementsService.resolveForTenant(tenant);
   }
 }
