@@ -169,4 +169,38 @@ describe('Tenant policies (e2e)', () => {
     expect(res.status).toBe(200);
     expect(res.body.policySet).toEqual(validPolicy);
   });
+
+  it('lists the version history newest-first (audit view)', async () => {
+    const token = await tokenFor('admin@test.com');
+    const tenantId = tenantIdFromToken(token);
+
+    await request(app.getHttpServer())
+      .put(`/api/tenants/${tenantId}/policy`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(validPolicy);
+    await request(app.getHttpServer())
+      .put(`/api/tenants/${tenantId}/policy`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...validPolicy, default: 'allow' });
+
+    const res = await request(app.getHttpServer())
+      .get(`/api/tenants/${tenantId}/policy/versions`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThanOrEqual(2);
+    // Newest first, and each row carries the audit fields.
+    expect(res.body[0].version).toBeGreaterThan(res.body[1].version);
+    expect(res.body[0]).toHaveProperty('createdBy');
+    expect(res.body[0]).toHaveProperty('createdAt');
+  });
+
+  it('rejects version history without a token (401)', async () => {
+    const token = await tokenFor('admin@test.com');
+    const tenantId = tenantIdFromToken(token);
+    await request(app.getHttpServer())
+      .get(`/api/tenants/${tenantId}/policy/versions`)
+      .expect(401);
+  });
 });

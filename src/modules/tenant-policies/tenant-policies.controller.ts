@@ -38,6 +38,12 @@ export class TenantPoliciesController {
     return row;
   }
 
+  /** Version history (audit view): who published which version and when. */
+  @Get('versions')
+  listVersions(@Param('tenantId') tenantId: string) {
+    return this.service.listVersions(tenantId);
+  }
+
   @Put()
   @HttpCode(200)
   async publish(

@@ -16,6 +16,18 @@ export class TenantPoliciesService {
   }
 
   /**
+   * The tenant's full policy version history (newest first). Every publish
+   * appends a row and archives the prior one, so this doubles as the audit log
+   * of who changed the policy and when (createdBy / createdAt / version).
+   */
+  listVersions(tenantId: string): Promise<TenantPolicyVersion[]> {
+    return this.repo.find({
+      where: { tenantId },
+      order: { version: 'DESC' },
+    });
+  }
+
+  /**
    * Publish a new policy set: archive the current published row (if any) and
    * insert a new one with the next version number. Exactly one published row
    * per tenant is preserved.
