@@ -7,5 +7,6 @@ export type AccessTokenPayload = {
   clientAppId?: string;
   serviceAccountId?: string;
   environmentId?: string;
+  scopes?: string[];
   type: 'access';
 };
