@@ -21,6 +21,7 @@ import { UpdateServiceAccountDto } from './dto/update-service-account.dto';
 import { CreateEnvironmentDto } from './dto/create-environment.dto';
 import { IssueServiceAccountTokenDto } from './dto/issue-service-account-token.dto';
 import { SetRotationPolicyDto } from './dto/set-rotation-policy.dto';
+import { API_SCOPES } from './api-scopes';
 
 @Controller()
 export class IntegrationsController {
@@ -152,6 +153,12 @@ export class IntegrationsController {
       serviceAccountId,
       dto.rotationIntervalDays ?? null,
     );
+  }
+
+  @Get('integrations/scopes')
+  @UseGuards(AccessJwtGuard)
+  listApiScopes() {
+    return { scopes: API_SCOPES };
   }
 
   @Post('integrations/service-account-token')
