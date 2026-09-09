@@ -31,6 +31,12 @@ export class ServiceAccount {
   @JoinColumn({ name: 'client_app_id' })
   clientApp!: ClientApp;
 
+  // Environment this key operates on. Nullable for backward compatibility:
+  // pre-existing keys are backfilled to their app's `production` environment
+  // by the AddEnvironments migration, and new keys always get one assigned.
+  @Column({ name: 'environment_id', type: 'uuid', nullable: true })
+  environmentId!: string | null;
+
   @Column()
   name!: string;
 
