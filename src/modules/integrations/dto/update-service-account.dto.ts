@@ -1,4 +1,13 @@
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
+import { API_SCOPES } from '../api-scopes';
 
 export class UpdateServiceAccountDto {
   @IsOptional()
@@ -14,4 +23,11 @@ export class UpdateServiceAccountDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // Replace the key's scopes wholesale. Validated against the allowlist.
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(API_SCOPES, { each: true })
+  scopes?: string[];
 }

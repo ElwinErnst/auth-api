@@ -223,6 +223,8 @@ export class IntegrationsService {
       environmentId: environment.id,
       name: dto.name,
       description: dto.description?.trim() || null,
+      // New keys are least-privilege: only the scopes explicitly requested.
+      scopes: dto.scopes ?? [],
       secretHash,
       secretPreview: preview,
       createdByUserId: createdByUserId ?? null,
@@ -252,6 +254,7 @@ export class IntegrationsService {
         ? {}
         : { description: dto.description?.trim() || null }),
       ...(dto.isActive == null ? {} : { isActive: dto.isActive }),
+      ...(dto.scopes == null ? {} : { scopes: dto.scopes }),
     });
 
     return this.toServiceAccount(
@@ -459,6 +462,7 @@ export class IntegrationsService {
       clientAppId: clientApp.id,
       serviceAccountId: account.id,
       environmentId: account.environmentId ?? undefined,
+      scopes: account.scopes ?? [],
     });
 
     await this.billingMetering.recordUsageEvent({
@@ -687,6 +691,7 @@ export class IntegrationsService {
       tenantId: account.tenantId,
       clientAppId: account.clientAppId,
       environmentId: account.environmentId,
+      scopes: account.scopes ?? [],
       name: account.name,
       description: account.description,
       secretPreview: account.secretPreview,
