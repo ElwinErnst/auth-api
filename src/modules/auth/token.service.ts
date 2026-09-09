@@ -26,6 +26,7 @@ export class TokenService {
     actorType?: 'user' | 'service_account';
     clientAppId?: string;
     serviceAccountId?: string;
+    environmentId?: string;
   }): Promise<string> {
     const payload: AccessTokenPayload = {
       sub: params.userId,
@@ -39,6 +40,9 @@ export class TokenService {
       ...(params.serviceAccountId == null
         ? {}
         : { serviceAccountId: params.serviceAccountId }),
+      ...(params.environmentId == null
+        ? {}
+        : { environmentId: params.environmentId }),
       type: 'access',
     };
 

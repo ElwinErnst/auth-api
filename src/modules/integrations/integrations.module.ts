@@ -6,13 +6,14 @@ import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { ClientApp } from './entities/client-app.entity';
 import { ServiceAccount } from './entities/service-account.entity';
+import { Environment } from './entities/environment.entity';
 import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
 import { SecretRotationCron } from './secret-rotation.cron';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ClientApp, ServiceAccount]),
+    TypeOrmModule.forFeature([ClientApp, ServiceAccount, Environment]),
     TenantsModule,
     EntitlementsModule,
     AuthModule,

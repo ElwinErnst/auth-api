@@ -21,11 +21,15 @@ import { TenantsService } from '../tenants/tenants.service';
 import { TokenService } from '../auth/token.service';
 import { ClientApp } from './entities/client-app.entity';
 import { ServiceAccount } from './entities/service-account.entity';
+import { Environment, EnvironmentName } from './entities/environment.entity';
 import { CreateClientAppDto } from './dto/create-client-app.dto';
 import { UpdateClientAppDto } from './dto/update-client-app.dto';
 import { CreateServiceAccountDto } from './dto/create-service-account.dto';
 import { UpdateServiceAccountDto } from './dto/update-service-account.dto';
+import { CreateEnvironmentDto } from './dto/create-environment.dto';
 import { IssueServiceAccountTokenDto } from './dto/issue-service-account-token.dto';
+
+const DEFAULT_ENVIRONMENT_NAME: EnvironmentName = 'production';
 
 @Injectable()
 export class IntegrationsService {
@@ -37,6 +41,8 @@ export class IntegrationsService {
     private readonly clientAppsRepository: Repository<ClientApp>,
     @InjectRepository(ServiceAccount)
     private readonly serviceAccountsRepository: Repository<ServiceAccount>,
+    @InjectRepository(Environment)
+    private readonly environmentsRepository: Repository<Environment>,
     private readonly billingMetering: BillingMeteringService,
     private readonly tenantsService: TenantsService,
     private readonly entitlementsService: EntitlementsService,
@@ -94,7 +100,14 @@ export class IntegrationsService {
       isActive: true,
     });
 
-    return this.toClientApp(await this.clientAppsRepository.save(app));
+    const saved = await this.clientAppsRepository.save(app);
+
+    // Every application starts with a `production` environment so keys, provider
+    // connections and webhooks always have a tier to hang off. Extra tiers
+    // (development / staging) are created explicitly.
+    await this.ensureEnvironment(saved, DEFAULT_ENVIRONMENT_NAME);
+
+    return this.toClientApp(saved);
   }
 
   async updateClientApp(
@@ -129,6 +142,39 @@ export class IntegrationsService {
     return this.toClientApp(await this.clientAppsRepository.save(app));
   }
 
+  async listEnvironments(tenantId: string, clientAppId: string) {
+    await this.assertAuthApiEnabled(tenantId);
+    await this.findClientApp(tenantId, clientAppId);
+
+    const environments = await this.environmentsRepository.find({
+      where: { tenantId, clientAppId },
+      order: { createdAt: 'ASC' },
+    });
+
+    return environments.map((environment) => this.toEnvironment(environment));
+  }
+
+  async createEnvironment(
+    tenantId: string,
+    clientAppId: string,
+    dto: CreateEnvironmentDto,
+  ) {
+    await this.assertAuthApiEnabled(tenantId);
+    const app = await this.findClientApp(tenantId, clientAppId);
+
+    const existing = await this.environmentsRepository.findOne({
+      where: { clientAppId, name: dto.name },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Environment "${dto.name}" already exists for this application`,
+      );
+    }
+
+    return this.toEnvironment(await this.ensureEnvironment(app, dto.name));
+  }
+
   async listServiceAccounts(tenantId: string, clientAppId: string) {
     await this.assertAuthApiEnabled(tenantId);
     await this.findClientApp(tenantId, clientAppId);
@@ -148,7 +194,7 @@ export class IntegrationsService {
     createdByUserId?: string | null,
   ) {
     const tenant = await this.assertAuthApiEnabled(tenantId);
-    await this.findClientApp(tenantId, clientAppId);
+    const app = await this.findClientApp(tenantId, clientAppId);
 
     const currentCount = await this.serviceAccountsRepository.count({
       where: { tenantId, clientAppId },
@@ -161,6 +207,12 @@ export class IntegrationsService {
       );
     }
 
+    // A key always binds to an environment. Caller may target one explicitly
+    // (must belong to this app); otherwise it defaults to `production`.
+    const environment = dto.environmentId
+      ? await this.findEnvironmentForApp(app, dto.environmentId)
+      : await this.ensureEnvironment(app, DEFAULT_ENVIRONMENT_NAME);
+
     const plainSecret = this.generateSecret();
     const secretHash = await this.hashSecret(plainSecret);
     const preview = `••••${plainSecret.slice(-6)}`;
@@ -168,6 +220,7 @@ export class IntegrationsService {
     const account = this.serviceAccountsRepository.create({
       tenantId,
       clientAppId,
+      environmentId: environment.id,
       name: dto.name,
       description: dto.description?.trim() || null,
       secretHash,
@@ -335,7 +388,10 @@ export class IntegrationsService {
       );
     }
 
-    const clientApp = await this.findClientAppForTokenIssuance(tenant.id, dto.clientAppId);
+    const clientApp = await this.findClientAppForTokenIssuance(
+      tenant.id,
+      dto.clientAppId,
+    );
     if (!clientApp.isActive) {
       throw new UnauthorizedException('Invalid service account credentials');
     }
@@ -402,6 +458,7 @@ export class IntegrationsService {
       actorType: 'service_account',
       clientAppId: clientApp.id,
       serviceAccountId: account.id,
+      environmentId: account.environmentId ?? undefined,
     });
 
     await this.billingMetering.recordUsageEvent({
@@ -458,6 +515,60 @@ export class IntegrationsService {
     return app;
   }
 
+  /**
+   * Idempotently get-or-create a named environment for an application. Safe to
+   * call repeatedly: the unique (client_app_id, name) index means a race just
+   * re-reads the winner instead of duplicating.
+   */
+  private async ensureEnvironment(
+    app: ClientApp,
+    name: EnvironmentName,
+  ): Promise<Environment> {
+    const existing = await this.environmentsRepository.findOne({
+      where: { clientAppId: app.id, name },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const environment = this.environmentsRepository.create({
+      tenantId: app.tenantId,
+      clientAppId: app.id,
+      name,
+      slug: `${app.slug}-${name}`,
+      isActive: true,
+    });
+
+    try {
+      return await this.environmentsRepository.save(environment);
+    } catch {
+      // Lost a concurrent create race — the other writer won, so re-read it.
+      const winner = await this.environmentsRepository.findOne({
+        where: { clientAppId: app.id, name },
+      });
+      if (!winner) {
+        throw new ConflictException('Could not create environment');
+      }
+      return winner;
+    }
+  }
+
+  private async findEnvironmentForApp(
+    app: ClientApp,
+    environmentId: string,
+  ): Promise<Environment> {
+    const environment = await this.environmentsRepository.findOne({
+      where: { id: environmentId, clientAppId: app.id, tenantId: app.tenantId },
+    });
+
+    if (!environment) {
+      throw new NotFoundException('Environment not found for this application');
+    }
+
+    return environment;
+  }
+
   private async findServiceAccount(tenantId: string, serviceAccountId: string) {
     const account = await this.serviceAccountsRepository.findOne({
       where: { id: serviceAccountId, tenantId },
@@ -470,7 +581,10 @@ export class IntegrationsService {
     return account;
   }
 
-  private async findClientAppForTokenIssuance(tenantId: string, clientAppId: string) {
+  private async findClientAppForTokenIssuance(
+    tenantId: string,
+    clientAppId: string,
+  ) {
     try {
       return await this.findClientApp(tenantId, clientAppId);
     } catch {
@@ -490,7 +604,10 @@ export class IntegrationsService {
   }
 
   private assertTokenIssuanceAllowed(account: ServiceAccount): void {
-    if (account.authBlockedUntil && account.authBlockedUntil.getTime() > Date.now()) {
+    if (
+      account.authBlockedUntil &&
+      account.authBlockedUntil.getTime() > Date.now()
+    ) {
       throw new UnauthorizedException('Too many failed attempts');
     }
   }
@@ -551,11 +668,25 @@ export class IntegrationsService {
     };
   }
 
+  private toEnvironment(environment: Environment) {
+    return {
+      id: environment.id,
+      tenantId: environment.tenantId,
+      clientAppId: environment.clientAppId,
+      name: environment.name,
+      slug: environment.slug,
+      isActive: environment.isActive,
+      createdAt: environment.createdAt,
+      updatedAt: environment.updatedAt,
+    };
+  }
+
   private toServiceAccount(account: ServiceAccount) {
     return {
       id: account.id,
       tenantId: account.tenantId,
       clientAppId: account.clientAppId,
+      environmentId: account.environmentId,
       name: account.name,
       description: account.description,
       secretPreview: account.secretPreview,

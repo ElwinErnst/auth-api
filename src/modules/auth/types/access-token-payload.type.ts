@@ -6,5 +6,6 @@ export type AccessTokenPayload = {
   actorType?: 'user' | 'service_account';
   clientAppId?: string;
   serviceAccountId?: string;
+  environmentId?: string;
   type: 'access';
 };
