@@ -18,6 +18,7 @@ import { CreateClientAppDto } from './dto/create-client-app.dto';
 import { UpdateClientAppDto } from './dto/update-client-app.dto';
 import { CreateServiceAccountDto } from './dto/create-service-account.dto';
 import { UpdateServiceAccountDto } from './dto/update-service-account.dto';
+import { CreateEnvironmentDto } from './dto/create-environment.dto';
 import { IssueServiceAccountTokenDto } from './dto/issue-service-account-token.dto';
 import { SetRotationPolicyDto } from './dto/set-rotation-policy.dto';
 
@@ -56,6 +57,31 @@ export class IntegrationsController {
     @Body() dto: UpdateClientAppDto,
   ) {
     return this.integrationsService.updateClientApp(tenantId, clientAppId, dto);
+  }
+
+  @Get('tenants/:tenantId/client-apps/:clientAppId/environments')
+  @UseGuards(AccessJwtGuard, RolesGuard, TenantScopeGuard)
+  @Roles('OWNER', 'ADMIN')
+  listEnvironments(
+    @Param('tenantId') tenantId: string,
+    @Param('clientAppId') clientAppId: string,
+  ) {
+    return this.integrationsService.listEnvironments(tenantId, clientAppId);
+  }
+
+  @Post('tenants/:tenantId/client-apps/:clientAppId/environments')
+  @UseGuards(AccessJwtGuard, RolesGuard, TenantScopeGuard)
+  @Roles('OWNER', 'ADMIN')
+  createEnvironment(
+    @Param('tenantId') tenantId: string,
+    @Param('clientAppId') clientAppId: string,
+    @Body() dto: CreateEnvironmentDto,
+  ) {
+    return this.integrationsService.createEnvironment(
+      tenantId,
+      clientAppId,
+      dto,
+    );
   }
 
   @Get('tenants/:tenantId/client-apps/:clientAppId/service-accounts')
