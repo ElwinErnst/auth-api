@@ -37,6 +37,12 @@ export class ServiceAccount {
   @Column({ name: 'environment_id', type: 'uuid', nullable: true })
   environmentId!: string | null;
 
+  // Scopes this key holds (see api-scopes.ts). Nullable for backward
+  // compatibility: pre-existing keys are backfilled to the broad legacy set by
+  // the AddServiceAccountScopes migration. Stored comma-joined (simple-array).
+  @Column({ name: 'scopes', type: 'simple-array', nullable: true })
+  scopes!: string[] | null;
+
   @Column()
   name!: string;
 
