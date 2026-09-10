@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { MembershipsModule } from '../memberships/memberships.module';
 import { SessionAnomalyModule } from '../session-anomaly/session-anomaly.module';
+import { AuditModule } from '../audit/audit.module';
 import { SessionsModule } from '../sessions/sessions.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { UsersModule } from '../users/users.module';
@@ -21,6 +22,7 @@ import { TokenService } from './token.service';
     MembershipsModule,
     SessionsModule,
     SessionAnomalyModule,
+    AuditModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, TokenService, PasswordService, JwtAccessStrategy],

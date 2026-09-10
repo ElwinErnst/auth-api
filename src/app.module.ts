@@ -19,6 +19,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { TenantPoliciesModule } from './modules/tenant-policies/tenant-policies.module';
+import { AuditModule } from './modules/audit/audit.module';
 import { MembershipsModule } from './modules/memberships/memberships.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { DemoSeedService } from './database/demo-seed.service';
@@ -107,6 +108,7 @@ import { ReplayModule } from './common/replay/replay.module';
     UsersModule,
     TenantsModule,
     TenantPoliciesModule,
+    AuditModule,
     EntitlementsModule,
     MembershipsModule,
     SessionsModule,
