@@ -2,7 +2,7 @@
   "name": "auth-api",
   "version": "1.0.0",
   "private": true,
-  "description": "SentinelSuite auth-api with multi-tenant auth, sessions and refresh rotation",
+  "description": "Sytadel auth-api with multi-tenant auth, sessions and refresh rotation",
   "scripts": {
     "build": "nest build",
     "start": "nest start",
@@ -72,5 +72,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.46.1"
-  }
+  },
+  "license": "Apache-2.0"
 }
