@@ -28,4 +28,10 @@ export class AuditController {
       limit: limit ? Number(limit) : undefined,
     });
   }
+
+  /** Verify the tamper-evident hash chain for this tenant's audit events. */
+  @Get('verify')
+  verify(@Param('tenantId') tenantId: string) {
+    return this.audit.verifyChain(tenantId);
+  }
 }
