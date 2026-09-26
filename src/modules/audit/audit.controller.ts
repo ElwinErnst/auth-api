@@ -1,9 +1,18 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AccessJwtGuard } from 'src/common/guards/access-jwt.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { TenantScopeGuard } from 'src/common/guards/tenant-scope.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { AuditService } from './audit.service';
+import { AuditCheckpointService } from './audit-checkpoint.service';
 
 /**
  * Tenant-scoped read API for this service's audit events. Mirrors the tenant
@@ -15,7 +24,10 @@ import { AuditService } from './audit.service';
 @UseGuards(AccessJwtGuard, RolesGuard, TenantScopeGuard)
 @Roles('OWNER', 'ADMIN')
 export class AuditController {
-  constructor(private readonly audit: AuditService) {}
+  constructor(
+    private readonly audit: AuditService,
+    private readonly checkpoints: AuditCheckpointService,
+  ) {}
 
   @Get()
   list(
@@ -29,9 +41,21 @@ export class AuditController {
     });
   }
 
-  /** Verify the tamper-evident hash chain for this tenant's audit events. */
+  /**
+   * Verify the tamper-evident hash chain AND its position against the latest
+   * anchored checkpoint (so suffix truncation is caught, not just interior
+   * edits). Returns the chain result plus the anchor status.
+   */
   @Get('verify')
   verify(@Param('tenantId') tenantId: string) {
-    return this.audit.verifyChain(tenantId);
+    return this.checkpoints.verifyScopeAnchored(tenantId);
+  }
+
+  /** Anchor the current chain head for this tenant (SIMULATED until a TSA is set). */
+  @Post('checkpoint')
+  @HttpCode(200)
+  async checkpoint(@Param('tenantId') tenantId: string) {
+    const outcome = await this.checkpoints.createCheckpoint(tenantId);
+    return { outcome };
   }
 }
