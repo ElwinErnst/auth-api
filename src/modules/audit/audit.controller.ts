@@ -47,8 +47,19 @@ export class AuditController {
    * edits). Returns the chain result plus the anchor status.
    */
   @Get('verify')
-  verify(@Param('tenantId') tenantId: string) {
-    return this.checkpoints.verifyScopeAnchored(tenantId);
+  async verify(@Param('tenantId') tenantId: string) {
+    const result = await this.checkpoints.verifyScopeAnchored(tenantId);
+    // Backward-compatible: keep the flat ChainVerifyResult fields at the top
+    // level (the console integrity panel reads status/checked/firstBreak there)
+    // and add the anchor fields alongside.
+    return {
+      ...result.chain,
+      anchorStatus: result.anchorStatus,
+      anchorReason: result.anchorReason,
+      anchoredSeq: result.anchoredSeq,
+      anchoredAt: result.anchoredAt,
+      anchorMode: result.anchorMode,
+    };
   }
 
   /** Anchor the current chain head for this tenant (SIMULATED until a TSA is set). */
