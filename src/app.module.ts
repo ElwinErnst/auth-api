@@ -45,6 +45,7 @@ import { AccessReviewModule } from './modules/access-review/access-review.module
 import { AccessRequestModule } from './modules/access-request/access-request.module';
 import { TenantAccessReview } from './modules/access-review/entities/tenant-access-review.entity';
 import { ReplayModule } from './common/replay/replay.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
 
 @Module({
   imports: [
@@ -119,6 +120,7 @@ import { ReplayModule } from './common/replay/replay.module';
     AccessReviewModule,
     AccessRequestModule,
     ReplayModule,
+    OrganizationsModule,
 
     // Per-IP rate limiting (300 req/min default, tunable via env). Uses the
     // real client IP thanks to `trust proxy` set in main.ts.
