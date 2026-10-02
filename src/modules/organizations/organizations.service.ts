@@ -8,6 +8,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { TenantsService } from '../tenants/tenants.service';
+import { MembershipsService } from '../memberships/memberships.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { Organization } from './entities/organization.entity';
 import { BillingAccount } from './entities/billing-account.entity';
@@ -23,6 +24,7 @@ export class OrganizationsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly usersService: UsersService,
     private readonly tenantsService: TenantsService,
+    private readonly tenantMembershipsService: MembershipsService,
     @InjectRepository(Organization)
     private readonly organizationsRepository: Repository<Organization>,
     @InjectRepository(OrganizationMembership)
@@ -91,6 +93,19 @@ export class OrganizationsService {
       'OWNER',
       'ADMIN',
     ]);
+    const tenantMembership =
+      await this.tenantMembershipsService.findActiveMembership(
+        userId,
+        tenantId,
+      );
+    if (
+      !tenantMembership ||
+      !['OWNER', 'ADMIN'].includes(tenantMembership.role)
+    ) {
+      throw new ForbiddenException(
+        'Active tenant owner or admin membership required',
+      );
+    }
     await this.organizationsServiceFind(organizationId);
     await this.tenantsService.findById(tenantId);
 

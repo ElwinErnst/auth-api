@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MembershipsModule } from '../memberships/memberships.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { UsersModule } from '../users/users.module';
 import { BillingAccount } from './entities/billing-account.entity';
@@ -19,6 +20,7 @@ import { OrganizationsService } from './organizations.service';
     ]),
     UsersModule,
     TenantsModule,
+    MembershipsModule,
   ],
   controllers: [OrganizationsController],
   providers: [OrganizationsService],
