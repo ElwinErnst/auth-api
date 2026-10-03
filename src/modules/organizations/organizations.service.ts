@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -197,6 +198,70 @@ export class OrganizationsService {
       }
       throw error;
     }
+  }
+
+  async authorizePlatformSubscriptionCoverage(input: {
+    organizationId: string;
+    billingAccountId: string;
+    actorUserId: string;
+    coveredTenantIds: string[];
+  }) {
+    await this.requireOrganizationRole(input.organizationId, input.actorUserId, [
+      'OWNER',
+      'ADMIN',
+    ]);
+
+    const organization = await this.organizationsRepository.findOne({
+      where: { id: input.organizationId },
+      relations: { billingAccount: true },
+    });
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+    if (organization.billingAccount?.id !== input.billingAccountId) {
+      throw new ForbiddenException(
+        'Billing account does not belong to this organization',
+      );
+    }
+
+    const tenantIds = input.coveredTenantIds;
+    if (!Array.isArray(tenantIds) || tenantIds.length === 0) {
+      throw new BadRequestException('At least one covered tenant is required');
+    }
+    if (new Set(tenantIds).size !== tenantIds.length) {
+      throw new BadRequestException('Covered tenant IDs must be unique');
+    }
+
+    for (const tenantId of tenantIds) {
+      const link = await this.linksRepository.findOne({
+        where: { organizationId: input.organizationId, tenantId },
+      });
+      if (!link) {
+        throw new ForbiddenException(
+          'Every covered tenant must be linked to the billing organization',
+        );
+      }
+
+      const tenantMembership =
+        await this.tenantMembershipsService.findActiveMembership(
+          input.actorUserId,
+          tenantId,
+        );
+      if (
+        !tenantMembership ||
+        !['OWNER', 'ADMIN'].includes(tenantMembership.role)
+      ) {
+        throw new ForbiddenException(
+          'Active tenant owner or admin membership required for every covered tenant',
+        );
+      }
+    }
+
+    return {
+      organizationId: input.organizationId,
+      billingAccountId: input.billingAccountId,
+      coveredTenantIds: [...tenantIds].sort(),
+    };
   }
 
   private async requireOrganizationRole(

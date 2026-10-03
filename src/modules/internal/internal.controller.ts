@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -14,6 +15,8 @@ import { MembershipsService } from '../memberships/memberships.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { UpdateTenantDto } from '../tenants/dto/update-tenant.dto';
 import { TenantPoliciesService } from '../tenant-policies/tenant-policies.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { AuthorizePlatformSubscriptionDto } from './dto/authorize-platform-subscription.dto';
 
 @Controller('internal')
 @UseGuards(InternalServiceGuard)
@@ -23,6 +26,7 @@ export class InternalController {
     private readonly entitlementsService: EntitlementsService,
     private readonly membershipsService: MembershipsService,
     private readonly tenantPoliciesService: TenantPoliciesService,
+    private readonly organizationsService: OrganizationsService,
   ) {}
 
   @Get('tenants/:id')
@@ -91,5 +95,18 @@ export class InternalController {
       role: membership.role,
       membershipActive: membership.isActive,
     }));
+  }
+
+  @Post('organizations/:organizationId/platform-subscription-authorization')
+  authorizePlatformSubscription(
+    @Param('organizationId') organizationId: string,
+    @Body() dto: AuthorizePlatformSubscriptionDto,
+  ) {
+    return this.organizationsService.authorizePlatformSubscriptionCoverage({
+      organizationId,
+      billingAccountId: dto.billingAccountId,
+      actorUserId: dto.actorUserId,
+      coveredTenantIds: dto.coveredTenantIds,
+    });
   }
 }
