@@ -46,12 +46,16 @@ describe('OrganizationsService', () => {
     const tenant = { id: 'tenant-1', name: 'Customer', slug: 'customer' };
     const tenants = { findById: jest.fn().mockResolvedValue(tenant) };
     const users = { findById: jest.fn().mockResolvedValue({ id: 'user-1' }) };
+    const tenantMemberships = {
+      findActiveMembership: jest.fn().mockResolvedValue({ role: 'OWNER' }),
+    };
 
     return {
       service: new OrganizationsService(
         dataSource as never,
         users as never,
         tenants as never,
+        tenantMemberships as never,
         organizations as never,
         memberships as never,
         links as never,
@@ -62,6 +66,7 @@ describe('OrganizationsService', () => {
       accounts,
       repositoryByEntity,
       tenant,
+      tenantMemberships,
       tenants,
       users,
     };
@@ -110,13 +115,17 @@ describe('OrganizationsService', () => {
   });
 
   it('links an existing tenant without changing tenant memberships', async () => {
-    const { service, memberships, links, tenants } = setup();
+    const { service, memberships, links, tenants, tenantMemberships } = setup();
     memberships.findOne.mockResolvedValue({ role: 'ADMIN', isActive: true });
     links.findOne.mockResolvedValue(null);
 
     await service.linkTenant('org-1', 'tenant-1', 'user-1');
 
     expect(tenants.findById).toHaveBeenCalledWith('tenant-1');
+    expect(tenantMemberships.findActiveMembership).toHaveBeenCalledWith(
+      'user-1',
+      'tenant-1',
+    );
     expect(links.save).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId: 'org-1',
@@ -124,6 +133,20 @@ describe('OrganizationsService', () => {
       }),
     );
     expect(memberships.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects an organization admin without tenant owner or admin authority', async () => {
+    const { service, memberships, links, tenants, tenantMemberships } = setup();
+    memberships.findOne.mockResolvedValue({ role: 'ADMIN', isActive: true });
+    tenantMemberships.findActiveMembership.mockResolvedValue({
+      role: 'MEMBER',
+    });
+
+    await expect(
+      service.linkTenant('org-1', 'tenant-1', 'user-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(tenants.findById).not.toHaveBeenCalled();
+    expect(links.save).not.toHaveBeenCalled();
   });
 
   it('rejects a tenant already linked to an organization', async () => {
