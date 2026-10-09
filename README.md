@@ -48,6 +48,10 @@ Pensados para uso server-to-server (protegidos por secreto + HMAC compartido, no
 - `GET /api/internal/tenants/:id`
 - `GET /api/internal/memberships/resolve?userId=...&tenantId=...`
 - `GET /api/internal/users/:userId/tenants`
+- `POST /api/internal/provisioning` — solo para el backend de confianza; recibe `idempotencyKey` en el cuerpo JSON firmado y provisiona una organización, cuenta de facturación, membresías de propietario, vínculo del tenant, aplicación, entorno de producción y cuenta de servicio.
+- `GET /api/internal/provisioning/:idempotencyKey` — devuelve el estado recuperable y los identificadores de recursos, sin devolver credenciales.
+
+Los reintentos del mismo solicitante y clave con la misma solicitud devuelven el mismo secreto de cuenta de servicio; reutilizar una clave con datos distintos se rechaza. El secreto se cifra con AES-256-GCM en el registro de provisioning y requiere configurar `AUTH_PROVISIONING_SECRET_ENCRYPTION_KEY` (32 bytes, base64). Mantenga esa clave estable y protegida; rótela únicamente junto con una migración planificada de credenciales cifradas retenidas. Los endpoints públicos de tenants y aplicaciones siguen aplicando sus entitlement habituales.
 
 ## Uso standalone
 

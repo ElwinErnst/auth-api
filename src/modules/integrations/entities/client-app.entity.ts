@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -12,6 +13,7 @@ import { Tenant } from '../../tenants/entities/tenant.entity';
 import { ServiceAccount } from './service-account.entity';
 
 @Entity('client_apps')
+@Index('UQ_client_apps_tenant_slug', ['tenantId', 'slug'], { unique: true })
 export class ClientApp {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
