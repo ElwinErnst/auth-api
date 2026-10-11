@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -8,6 +9,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { TenantsService } from '../tenants/tenants.service';
+import { MembershipsService } from '../memberships/memberships.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { Organization } from './entities/organization.entity';
 import { BillingAccount } from './entities/billing-account.entity';
@@ -23,6 +25,7 @@ export class OrganizationsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly usersService: UsersService,
     private readonly tenantsService: TenantsService,
+    private readonly tenantMembershipsService: MembershipsService,
     @InjectRepository(Organization)
     private readonly organizationsRepository: Repository<Organization>,
     @InjectRepository(OrganizationMembership)
@@ -91,6 +94,19 @@ export class OrganizationsService {
       'OWNER',
       'ADMIN',
     ]);
+    const tenantMembership =
+      await this.tenantMembershipsService.findActiveMembership(
+        userId,
+        tenantId,
+      );
+    if (
+      !tenantMembership ||
+      !['OWNER', 'ADMIN'].includes(tenantMembership.role)
+    ) {
+      throw new ForbiddenException(
+        'Active tenant owner or admin membership required',
+      );
+    }
     await this.organizationsServiceFind(organizationId);
     await this.tenantsService.findById(tenantId);
 
@@ -182,6 +198,70 @@ export class OrganizationsService {
       }
       throw error;
     }
+  }
+
+  async authorizePlatformSubscriptionCoverage(input: {
+    organizationId: string;
+    billingAccountId: string;
+    actorUserId: string;
+    coveredTenantIds: string[];
+  }) {
+    await this.requireOrganizationRole(input.organizationId, input.actorUserId, [
+      'OWNER',
+      'ADMIN',
+    ]);
+
+    const organization = await this.organizationsRepository.findOne({
+      where: { id: input.organizationId },
+      relations: { billingAccount: true },
+    });
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+    if (organization.billingAccount?.id !== input.billingAccountId) {
+      throw new ForbiddenException(
+        'Billing account does not belong to this organization',
+      );
+    }
+
+    const tenantIds = input.coveredTenantIds;
+    if (!Array.isArray(tenantIds) || tenantIds.length === 0) {
+      throw new BadRequestException('At least one covered tenant is required');
+    }
+    if (new Set(tenantIds).size !== tenantIds.length) {
+      throw new BadRequestException('Covered tenant IDs must be unique');
+    }
+
+    for (const tenantId of tenantIds) {
+      const link = await this.linksRepository.findOne({
+        where: { organizationId: input.organizationId, tenantId },
+      });
+      if (!link) {
+        throw new ForbiddenException(
+          'Every covered tenant must be linked to the billing organization',
+        );
+      }
+
+      const tenantMembership =
+        await this.tenantMembershipsService.findActiveMembership(
+          input.actorUserId,
+          tenantId,
+        );
+      if (
+        !tenantMembership ||
+        !['OWNER', 'ADMIN'].includes(tenantMembership.role)
+      ) {
+        throw new ForbiddenException(
+          'Active tenant owner or admin membership required for every covered tenant',
+        );
+      }
+    }
+
+    return {
+      organizationId: input.organizationId,
+      billingAccountId: input.billingAccountId,
+      coveredTenantIds: [...tenantIds].sort(),
+    };
   }
 
   private async requireOrganizationRole(

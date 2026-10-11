@@ -21,5 +21,7 @@ export default registerAs('internal', () => ({
     'AUTH_INTERNAL_HMAC_SECRET',
     'change-me-internal-hmac-secret',
   ),
+  provisioningSecretEncryptionKey:
+    process.env.AUTH_PROVISIONING_SECRET_ENCRYPTION_KEY?.trim() ?? '',
   maxClockSkewMs: Number(process.env.AUTH_INTERNAL_MAX_CLOCK_SKEW_MS ?? 30000),
 }));

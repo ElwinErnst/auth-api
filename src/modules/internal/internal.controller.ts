@@ -4,7 +4,9 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -14,6 +16,10 @@ import { MembershipsService } from '../memberships/memberships.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { UpdateTenantDto } from '../tenants/dto/update-tenant.dto';
 import { TenantPoliciesService } from '../tenant-policies/tenant-policies.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { AuthorizePlatformSubscriptionDto } from './dto/authorize-platform-subscription.dto';
+import { ProvisionSaaSRequestDto } from '../provisioning/provisioning.dto';
+import { ProvisioningService } from '../provisioning/provisioning.service';
 
 @Controller('internal')
 @UseGuards(InternalServiceGuard)
@@ -23,6 +29,8 @@ export class InternalController {
     private readonly entitlementsService: EntitlementsService,
     private readonly membershipsService: MembershipsService,
     private readonly tenantPoliciesService: TenantPoliciesService,
+    private readonly organizationsService: OrganizationsService,
+    private readonly provisioningService: ProvisioningService,
   ) {}
 
   @Get('tenants/:id')
@@ -91,5 +99,30 @@ export class InternalController {
       role: membership.role,
       membershipActive: membership.isActive,
     }));
+  }
+
+  @Post('organizations/:organizationId/platform-subscription-authorization')
+  authorizePlatformSubscription(
+    @Param('organizationId') organizationId: string,
+    @Body() dto: AuthorizePlatformSubscriptionDto,
+  ) {
+    return this.organizationsService.authorizePlatformSubscriptionCoverage({
+      organizationId,
+      billingAccountId: dto.billingAccountId,
+      actorUserId: dto.actorUserId,
+      coveredTenantIds: dto.coveredTenantIds,
+    });
+  }
+
+  @Post('provisioning')
+  provisionSaaS(@Body() dto: ProvisionSaaSRequestDto) {
+    return this.provisioningService.provision(dto);
+  }
+
+  @Get('provisioning/:idempotencyKey')
+  getProvisioningStatus(
+    @Param('idempotencyKey', new ParseUUIDPipe()) idempotencyKey: string,
+  ) {
+    return this.provisioningService.getStatus(idempotencyKey);
   }
 }

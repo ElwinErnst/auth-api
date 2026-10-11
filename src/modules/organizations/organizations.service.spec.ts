@@ -1,4 +1,8 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { BillingAccount } from './entities/billing-account.entity';
 import { OrganizationMembership } from './entities/organization-membership.entity';
 import { OrganizationTenant } from './entities/organization-tenant.entity';
@@ -6,7 +10,12 @@ import { Organization } from './entities/organization.entity';
 import { OrganizationsService } from './organizations.service';
 
 describe('OrganizationsService', () => {
-  const organization = { id: 'org-1', name: 'Acme', slug: 'acme' };
+  const organization = {
+    id: 'org-1',
+    name: 'Acme',
+    slug: 'acme',
+    billingAccount: { id: 'billing-1' },
+  };
 
   function setup() {
     const memberships = {
@@ -46,12 +55,16 @@ describe('OrganizationsService', () => {
     const tenant = { id: 'tenant-1', name: 'Customer', slug: 'customer' };
     const tenants = { findById: jest.fn().mockResolvedValue(tenant) };
     const users = { findById: jest.fn().mockResolvedValue({ id: 'user-1' }) };
+    const tenantMemberships = {
+      findActiveMembership: jest.fn().mockResolvedValue({ role: 'OWNER' }),
+    };
 
     return {
       service: new OrganizationsService(
         dataSource as never,
         users as never,
         tenants as never,
+        tenantMemberships as never,
         organizations as never,
         memberships as never,
         links as never,
@@ -62,6 +75,7 @@ describe('OrganizationsService', () => {
       accounts,
       repositoryByEntity,
       tenant,
+      tenantMemberships,
       tenants,
       users,
     };
@@ -110,13 +124,17 @@ describe('OrganizationsService', () => {
   });
 
   it('links an existing tenant without changing tenant memberships', async () => {
-    const { service, memberships, links, tenants } = setup();
+    const { service, memberships, links, tenants, tenantMemberships } = setup();
     memberships.findOne.mockResolvedValue({ role: 'ADMIN', isActive: true });
     links.findOne.mockResolvedValue(null);
 
     await service.linkTenant('org-1', 'tenant-1', 'user-1');
 
     expect(tenants.findById).toHaveBeenCalledWith('tenant-1');
+    expect(tenantMemberships.findActiveMembership).toHaveBeenCalledWith(
+      'user-1',
+      'tenant-1',
+    );
     expect(links.save).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId: 'org-1',
@@ -124,6 +142,20 @@ describe('OrganizationsService', () => {
       }),
     );
     expect(memberships.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects an organization admin without tenant owner or admin authority', async () => {
+    const { service, memberships, links, tenants, tenantMemberships } = setup();
+    memberships.findOne.mockResolvedValue({ role: 'ADMIN', isActive: true });
+    tenantMemberships.findActiveMembership.mockResolvedValue({
+      role: 'MEMBER',
+    });
+
+    await expect(
+      service.linkTenant('org-1', 'tenant-1', 'user-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(tenants.findById).not.toHaveBeenCalled();
+    expect(links.save).not.toHaveBeenCalled();
   });
 
   it('rejects a tenant already linked to an organization', async () => {
@@ -151,5 +183,91 @@ describe('OrganizationsService', () => {
       ),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(memberships.save).not.toHaveBeenCalled();
+  });
+
+  it('authorizes an organization admin for linked tenants they administer', async () => {
+    const { service, memberships, links, tenantMemberships } = setup();
+    memberships.findOne.mockResolvedValue({ role: 'ADMIN', isActive: true });
+    links.findOne.mockResolvedValue({ organizationId: 'org-1' });
+    tenantMemberships.findActiveMembership.mockResolvedValue({ role: 'OWNER' });
+
+    await expect(
+      service.authorizePlatformSubscriptionCoverage({
+        organizationId: 'org-1',
+        billingAccountId: 'billing-1',
+        actorUserId: 'user-1',
+        coveredTenantIds: ['tenant-2', 'tenant-1'],
+      }),
+    ).resolves.toEqual({
+      organizationId: 'org-1',
+      billingAccountId: 'billing-1',
+      coveredTenantIds: ['tenant-1', 'tenant-2'],
+    });
+    expect(links.findOne).toHaveBeenCalledTimes(2);
+    expect(tenantMemberships.findActiveMembership).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects a billing account belonging to another organization', async () => {
+    const { service, memberships, links } = setup();
+    memberships.findOne.mockResolvedValue({ role: 'OWNER', isActive: true });
+
+    await expect(
+      service.authorizePlatformSubscriptionCoverage({
+        organizationId: 'org-1',
+        billingAccountId: 'billing-other',
+        actorUserId: 'user-1',
+        coveredTenantIds: ['tenant-1'],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(links.findOne).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unlinked tenant or a tenant the actor cannot administer', async () => {
+    const { service, memberships, links, tenantMemberships } = setup();
+    memberships.findOne.mockResolvedValue({ role: 'OWNER', isActive: true });
+    links.findOne.mockResolvedValue(null);
+
+    await expect(
+      service.authorizePlatformSubscriptionCoverage({
+        organizationId: 'org-1',
+        billingAccountId: 'billing-1',
+        actorUserId: 'user-1',
+        coveredTenantIds: ['tenant-1'],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    links.findOne.mockResolvedValue({ organizationId: 'org-1' });
+    tenantMemberships.findActiveMembership.mockResolvedValue({ role: 'MEMBER' });
+    await expect(
+      service.authorizePlatformSubscriptionCoverage({
+        organizationId: 'org-1',
+        billingAccountId: 'billing-1',
+        actorUserId: 'user-1',
+        coveredTenantIds: ['tenant-1'],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects empty or duplicate platform coverage requests', async () => {
+    const { service, memberships, links } = setup();
+    memberships.findOne.mockResolvedValue({ role: 'OWNER', isActive: true });
+
+    await expect(
+      service.authorizePlatformSubscriptionCoverage({
+        organizationId: 'org-1',
+        billingAccountId: 'billing-1',
+        actorUserId: 'user-1',
+        coveredTenantIds: [],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.authorizePlatformSubscriptionCoverage({
+        organizationId: 'org-1',
+        billingAccountId: 'billing-1',
+        actorUserId: 'user-1',
+        coveredTenantIds: ['tenant-1', 'tenant-1'],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(links.findOne).not.toHaveBeenCalled();
   });
 });
