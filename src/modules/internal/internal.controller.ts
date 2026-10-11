@@ -4,6 +4,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -17,6 +18,8 @@ import { UpdateTenantDto } from '../tenants/dto/update-tenant.dto';
 import { TenantPoliciesService } from '../tenant-policies/tenant-policies.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { AuthorizePlatformSubscriptionDto } from './dto/authorize-platform-subscription.dto';
+import { ProvisionSaaSRequestDto } from '../provisioning/provisioning.dto';
+import { ProvisioningService } from '../provisioning/provisioning.service';
 
 @Controller('internal')
 @UseGuards(InternalServiceGuard)
@@ -27,6 +30,7 @@ export class InternalController {
     private readonly membershipsService: MembershipsService,
     private readonly tenantPoliciesService: TenantPoliciesService,
     private readonly organizationsService: OrganizationsService,
+    private readonly provisioningService: ProvisioningService,
   ) {}
 
   @Get('tenants/:id')
@@ -108,5 +112,17 @@ export class InternalController {
       actorUserId: dto.actorUserId,
       coveredTenantIds: dto.coveredTenantIds,
     });
+  }
+
+  @Post('provisioning')
+  provisionSaaS(@Body() dto: ProvisionSaaSRequestDto) {
+    return this.provisioningService.provision(dto);
+  }
+
+  @Get('provisioning/:idempotencyKey')
+  getProvisioningStatus(
+    @Param('idempotencyKey', new ParseUUIDPipe()) idempotencyKey: string,
+  ) {
+    return this.provisioningService.getStatus(idempotencyKey);
   }
 }
