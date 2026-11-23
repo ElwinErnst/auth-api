@@ -115,6 +115,33 @@ describe('Auth API (e2e)', () => {
     expect(reuseResponse.status).toBe(401);
   });
 
+  it('POST /api/auth/refresh -> reuse del viejo revoca la familia y mata el token nuevo', async () => {
+    const loginResponse = await login();
+    const oldRefreshToken = loginResponse.body.refreshToken as string;
+
+    // Rotación legítima: old -> new.
+    const rotateResponse = await request(app.getHttpServer())
+      .post('/api/auth/refresh')
+      .send({ refreshToken: oldRefreshToken });
+
+    expect(rotateResponse.status).toBe(201);
+    const newRefreshToken = rotateResponse.body.refreshToken as string;
+
+    // Reuse del token viejo (ya rotado): evidencia de robo -> 401.
+    const reuseResponse = await request(app.getHttpServer())
+      .post('/api/auth/refresh')
+      .send({ refreshToken: oldRefreshToken });
+
+    expect(reuseResponse.status).toBe(401);
+
+    // Detección de reuso: el token nuevo también debe morir (familia revocada).
+    const newAfterReuse = await request(app.getHttpServer())
+      .post('/api/auth/refresh')
+      .send({ refreshToken: newRefreshToken });
+
+    expect(newAfterReuse.status).toBe(401);
+  });
+
   it('POST /api/auth/logout -> invalida la sesión actual', async () => {
     const loginResponse = await login();
     const refreshToken = loginResponse.body.refreshToken as string;

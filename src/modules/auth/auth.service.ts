@@ -151,6 +151,20 @@ export class AuthService {
     );
 
     if (!currentSession) {
+      // Reuse detection: a syntactically valid refresh token whose session is
+      // no longer active means the token was already rotated or revoked and is
+      // now being replayed — the hallmark of a stolen token. Revoke the whole
+      // family so any still-live token in it (e.g. the one the legitimate
+      // rotation produced) dies too.
+      const knownSession = await this.sessionsService.findById(payload.sid);
+
+      if (knownSession) {
+        await this.sessionsService.revokeFamily(
+          knownSession.familyId,
+          'refresh_token_reuse_detected',
+        );
+      }
+
       throw new UnauthorizedException('Session is not active');
     }
 
